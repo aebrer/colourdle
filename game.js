@@ -37,25 +37,6 @@
     };
   }
 
-  function rgbToHSB(r, g, b) {
-    r /= 255; g /= 255; b /= 255;
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    const d = max - min;
-    let h, s;
-    s = max === 0 ? 0 : d / max;
-    if (d === 0) h = 0;
-    else if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
-    else if (max === g) h = ((b - r) / d + 2) * 60;
-    else h = ((r - g) / d + 4) * 60;
-    return { h, s: s * 100, b: max * 100 };
-  }
-
-  function hexToHSB(hex) {
-    const { r, g, b } = hexToRGB(hex);
-    return rgbToHSB(r, g, b);
-  }
-
   // Relative luminance (WCAG)
   function luminance(hex) {
     const { r, g, b } = hexToRGB(hex);
@@ -82,17 +63,48 @@
   }
 
   // ----------------------------------------------------------
-  // HSB distance (0 = identical, 1 = max distance)
+  // CIELAB Delta E (CIE76) — perceptual colour distance
   // ----------------------------------------------------------
-  function hsbDistance(hsb1, hsb2) {
-    const hueDiff = Math.min(
-      Math.abs(hsb1.h - hsb2.h),
-      360 - Math.abs(hsb1.h - hsb2.h)
-    );
-    const hN = hueDiff / 180;
-    const sN = Math.abs(hsb1.s - hsb2.s) / 100;
-    const bN = Math.abs(hsb1.b - hsb2.b) / 100;
-    return Math.sqrt(hN * hN + sN * sN + bN * bN) / Math.sqrt(3);
+  function rgbToLab(r, g, b) {
+    // sRGB to linear
+    var rgb = [r / 255, g / 255, b / 255].map(function (c) {
+      return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+
+    // Linear RGB to XYZ (D65)
+    var x = rgb[0] * 0.4124564 + rgb[1] * 0.3575761 + rgb[2] * 0.1804375;
+    var y = rgb[0] * 0.2126729 + rgb[1] * 0.7151522 + rgb[2] * 0.0721750;
+    var z = rgb[0] * 0.0193339 + rgb[1] * 0.1191920 + rgb[2] * 0.9503041;
+
+    // XYZ to Lab (D65 reference white)
+    x /= 0.95047; y /= 1.00000; z /= 1.08883;
+    var f = function (t) {
+      return t > 0.008856 ? Math.pow(t, 1 / 3) : (7.787 * t) + (16 / 116);
+    };
+    return {
+      L: (116 * f(y)) - 16,
+      a: 500 * (f(x) - f(y)),
+      b: 200 * (f(y) - f(z)),
+    };
+  }
+
+  function hexToLab(hex) {
+    var c = hexToRGB(hex);
+    return rgbToLab(c.r, c.g, c.b);
+  }
+
+  function deltaE(lab1, lab2) {
+    var dL = lab1.L - lab2.L;
+    var da = lab1.a - lab2.a;
+    var db = lab1.b - lab2.b;
+    return Math.sqrt(dL * dL + da * da + db * db);
+  }
+
+  // Sigmoid scoring: Delta E → 0-100 score
+  // dE=0 → 100, dE~30 → ~50, dE~80+ → near 0
+  function colourScore(hex1, hex2) {
+    var dE = deltaE(hexToLab(hex1), hexToLab(hex2));
+    return 100 / (1 + Math.pow(dE / 30, 1.8));
   }
 
   // ----------------------------------------------------------
@@ -269,11 +281,15 @@
     const match = findBestMatch(input);
 
     const nameScore = stringSimilarity(input, target.name);
-    const targetHSB = hexToHSB(target.hex);
-    const guessHSB = hexToHSB(match.colour.hex);
-    const dist = hsbDistance(targetHSB, guessHSB);
-    const hsbScore = Math.round((1 - dist) * 100);
-    const roundTotal = nameScore + hsbScore;
+    const hsbScore = Math.round(colourScore(target.hex, match.colour.hex));
+
+    // Exact colour match bonus (2x) — matched the exact same colour entry
+    const exactMatch = match.colour.hex === target.hex;
+
+    // Power mean (p=3) — favours the higher of the two scores
+    const p = 3;
+    var roundTotal = Math.round(Math.pow((Math.pow(nameScore, p) + Math.pow(hsbScore, p)) / 2, 1 / p));
+    if (exactMatch) roundTotal = roundTotal * 2;
 
     state.results.push({
       target: target,
@@ -365,7 +381,7 @@
       ['Total', state.totalScore, maxTotal],
     ].forEach(function (item) {
       var label = item[0], value = item[1], max = item[2];
-      var d = el('div', 'summary-total-item');
+      const d = el('div', 'summary-total-item');
       d.appendChild(el('div', 'summary-total-label', label));
       d.appendChild(el('div', 'summary-total-value ' + scoreClass(value, max), value + '/' + max));
       totalsEl.appendChild(d);
