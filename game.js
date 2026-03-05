@@ -307,8 +307,10 @@
   function showResult(result) {
     $('#result-target').style.backgroundColor = result.target.hex;
     $('#result-target-name').textContent = result.target.name;
+    $('#result-target-source').textContent = result.target.src;
     $('#result-guess').style.backgroundColor = result.matched.hex;
     $('#result-guess-name').textContent = '"' + result.guess + '" \u2192 ' + result.matched.name;
+    $('#result-guess-source').textContent = result.matched.src;
     $('#hint-hsb').textContent = 'How close is "' + result.matched.name + '" to the colour?';
 
     const barName = $('#bar-name');
@@ -367,6 +369,7 @@
 
       const nameWrap = el('div', 'summary-name');
       nameWrap.appendChild(el('div', 'summary-target-name', r.target.name));
+      nameWrap.appendChild(el('div', 'summary-source', r.target.src));
       nameWrap.appendChild(el('div', 'summary-guess-name', r.guess + ' \u2192 ' + r.matched.name));
 
       const score = el('div', 'summary-score ' + scoreClass(r.total, 200), String(r.total));

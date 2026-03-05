@@ -368,7 +368,7 @@ def main():
     all_colours = []
     seen_names = set()
 
-    def add_source(name, colours):
+    def add_source(source_name, colours):
         count = 0
         for colour_name, hex_val in colours:
             key = colour_name.lower().strip()
@@ -378,21 +378,24 @@ def main():
             if len(hex_val) != 7:
                 continue
             seen_names.add(key)
-            all_colours.append((colour_name, hex_val))
+            all_colours.append((colour_name, hex_val, source_name))
             count += 1
-        print(f"  {name}: {count} unique colours added")
+        print(f"  {source_name}: {count} unique colours added")
 
-    add_source("CSS/X11", collect_css_colors())
+    # CSS/X11 dropped — names poorly match their actual colours (e.g. "Lavender" is white)
+    # add_source("CSS/X11", collect_css_colors())
+    # Priority order: Crayola > Pantone > XKCD > Japanese > RAL
+    # First seen wins on name collisions
     add_source("Crayola", collect_crayola())
-
-    print("  Fetching XKCD survey colours...")
-    add_source("XKCD", collect_xkcd())
 
     print("  Fetching Pantone colours...")
     add_source("Pantone", collect_pantone())
 
-    add_source("Japanese Traditional", collect_japanese())
-    add_source("RAL Industrial", collect_ral())
+    print("  Fetching XKCD survey colours...")
+    add_source("XKCD", collect_xkcd())
+
+    add_source("Japanese", collect_japanese())
+    add_source("RAL", collect_ral())
 
     # Sort alphabetically
     all_colours.sort(key=lambda x: x[0].lower())
@@ -406,10 +409,9 @@ def main():
              "",
              "const COLOURS = ["]
 
-    for name, hex_val in all_colours:
-        # Escape any quotes in name
+    for name, hex_val, source in all_colours:
         safe_name = name.replace("'", "\\'")
-        lines.append(f"  {{name:'{safe_name}',hex:'{hex_val}'}},")
+        lines.append(f"  {{name:'{safe_name}',hex:'{hex_val}',src:'{source}'}},")
 
     lines.append("];")
 

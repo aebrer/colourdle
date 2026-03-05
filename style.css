@@ -232,6 +232,14 @@ nav {
   word-break: break-word;
 }
 
+.swatch-source {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  opacity: 0.5;
+}
+
 .result-scores {
   display: flex;
   flex-direction: column;
@@ -343,6 +351,12 @@ nav {
 
 .summary-target-name {
   color: var(--text);
+}
+
+.summary-source {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  opacity: 0.5;
 }
 
 .summary-guess-name {
