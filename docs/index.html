@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Colourdle — Name That Colour</title>
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='12' fill='%23E8594F'/><rect x='15' y='15' width='70' height='70' rx='6' fill='%234BA3C3'/></svg>">
   <meta name="description" content="A daily colour-naming game. See a colour, guess its name. Scored by name similarity and perceptual colour distance across 3,000+ named colours.">
   <meta name="author" content="Drew Brereton">
 
@@ -33,12 +35,14 @@
         <span class="nav">
           <button id="btn-daily" class="mode-btn active">Daily</button>
           <button id="btn-infinite" class="mode-btn">Infinite</button>
+          <button id="btn-theme" class="mode-btn" title="Toggle dark mode">Dark</button>
         </span>
       </div>
       <div class="fill-centre">
         <p class="hero">Name that colour.</p>
         <p class="sub">5 colours. Guess each name.<br>Score by name + colour proximity.</p>
         <button id="btn-start" class="btn">Play</button>
+        <div id="history" class="history"></div>
       </div>
       <div class="credit">by <a href="https://entropist.ca" target="_blank" rel="noopener">Drew Brereton</a> · <a href="https://github.com/aebrer/colourdle" target="_blank" rel="noopener">source</a></div>
     </div>
@@ -55,6 +59,7 @@
           <input type="text" id="guess-input" placeholder="..." autocomplete="off" autocapitalize="off" spellcheck="false">
           <button id="btn-guess" class="btn">&rarr;</button>
         </div>
+        <button id="btn-finish" class="btn dim" style="display:none">Finish</button>
       </div>
     </div>
 
@@ -96,6 +101,7 @@
     <!-- Summary screen -->
     <div id="screen-summary" class="screen">
       <div class="chrome top">
+        <button id="btn-back" class="btn dim" style="display:none">&larr;</button>
         <span id="summary-title">Results</span>
       </div>
       <div class="summary-body">

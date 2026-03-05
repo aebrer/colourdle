@@ -56,10 +56,15 @@
     document.documentElement.style.setProperty('--fg-dim', dark ? '#00000066' : '#ffffff66');
   }
 
+  function isDark() {
+    return document.documentElement.classList.contains('dark');
+  }
+
   function resetTheme() {
-    document.documentElement.style.setProperty('--bg', '#fff');
-    document.documentElement.style.setProperty('--fg', '#000');
-    document.documentElement.style.setProperty('--fg-dim', '#00000088');
+    // Clear inline overrides so CSS class takes effect
+    document.documentElement.style.removeProperty('--bg');
+    document.documentElement.style.removeProperty('--fg');
+    document.documentElement.style.removeProperty('--fg-dim');
   }
 
   // ----------------------------------------------------------
@@ -235,9 +240,85 @@
   }
 
   // ----------------------------------------------------------
+  // localStorage persistence
+  // ----------------------------------------------------------
+  var STORAGE_KEY = 'colourdle';
+
+  function loadStorage() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveDaily(dayNum, results, totals) {
+    var store = loadStorage();
+    if (!store.days) store.days = {};
+    store.days[dayNum] = {
+      results: results.map(function (r) {
+        return {
+          targetName: r.target.name,
+          targetHex: r.target.hex,
+          targetSrc: r.target.src,
+          guess: r.guess,
+          matchedName: r.matched.name,
+          matchedHex: r.matched.hex,
+          matchedSrc: r.matched.src,
+          nameScore: r.nameScore,
+          hsbScore: r.hsbScore,
+          total: r.total,
+        };
+      }),
+      totalName: totals.name,
+      totalHSB: totals.hsb,
+      totalScore: totals.score,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  }
+
+  function getDailyResult(dayNum) {
+    var store = loadStorage();
+    return store.days && store.days[dayNum] || null;
+  }
+
+  function getAllDailyResults() {
+    var store = loadStorage();
+    return store.days || {};
+  }
+
+  // Reconstruct state.results from saved data for summary display
+  function savedToResults(saved) {
+    return saved.results.map(function (r) {
+      return {
+        target: { name: r.targetName, hex: r.targetHex, src: r.targetSrc },
+        guess: r.guess,
+        matched: { name: r.matchedName, hex: r.matchedHex, src: r.matchedSrc },
+        nameScore: r.nameScore,
+        hsbScore: r.hsbScore,
+        total: r.total,
+      };
+    });
+  }
+
+  // ----------------------------------------------------------
   // Game flow
   // ----------------------------------------------------------
   function startGame() {
+    // If daily already completed, show saved summary
+    if (state.mode === 'daily') {
+      var saved = getDailyResult(getDailyNumber());
+      if (saved) {
+        state.results = savedToResults(saved);
+        state.totalName = saved.totalName;
+        state.totalHSB = saved.totalHSB;
+        state.totalScore = saved.totalScore;
+        state.playing = false;
+        showSummary();
+        return;
+      }
+    }
+
     state.round = 0;
     state.results = [];
     state.totalName = 0;
@@ -267,6 +348,9 @@
     $('#running-score').textContent = state.totalScore;
     $('#game-source').textContent = target.src;
     $('#guess-input').value = '';
+
+    // Show finish button in infinite mode after at least 1 round
+    $('#btn-finish').style.display = (state.mode === 'infinite' && state.round > 0) ? '' : 'none';
 
     setTheme(target.hex);
     showScreen('game');
@@ -344,23 +428,96 @@
 
   function showSummary() {
     state.playing = false;
+    viewingHistory = false;
+
+    if (state.mode === 'daily') {
+      var dayNum = getDailyNumber();
+      $('#summary-title').textContent = 'Colourdle #' + dayNum;
+      $('#btn-back').style.display = 'none';
+      // Persist daily results
+      if (!getDailyResult(dayNum)) {
+        saveDaily(dayNum, state.results, {
+          name: state.totalName,
+          hsb: state.totalHSB,
+          score: state.totalScore,
+        });
+      }
+    } else {
+      $('#summary-title').textContent = 'Infinite \u2014 ' + state.results.length + ' rounds';
+      $('#btn-back').style.display = 'none';
+    }
+
+    showSummaryContent();
+    showScreen('summary');
+  }
+
+  // ----------------------------------------------------------
+  // History
+  // ----------------------------------------------------------
+  var viewingHistory = false;
+
+  function renderHistory() {
+    var historyEl = $('#history');
+    historyEl.textContent = '';
+    var days = getAllDailyResults();
+    var dayNums = Object.keys(days).map(Number).sort(function (a, b) { return b - a; });
+    if (dayNums.length === 0) return;
+
+    historyEl.appendChild(el('div', 'history-title', 'History'));
+
+    dayNums.forEach(function (num) {
+      var day = days[num];
+      var maxScore = day.results.length * 200;
+      var row = el('button', 'history-row');
+
+      var label = el('span', 'history-label', '#' + num);
+      var score = el('span', 'history-score ' + scoreClass(day.totalScore, maxScore),
+        day.totalScore + '/' + maxScore);
+
+      row.appendChild(label);
+      row.appendChild(score);
+      row.addEventListener('click', function () { viewDay(num); });
+      historyEl.appendChild(row);
+    });
+  }
+
+  function viewDay(dayNum) {
+    var saved = getDailyResult(dayNum);
+    if (!saved) return;
+
+    viewingHistory = true;
+    state.results = savedToResults(saved);
+    state.totalName = saved.totalName;
+    state.totalHSB = saved.totalHSB;
+    state.totalScore = saved.totalScore;
+    state.mode = 'daily';
+
+    // Temporarily override getDailyNumber for summary title
+    var realDay = getDailyNumber();
+    $('#summary-title').textContent = 'Colourdle #' + dayNum;
+    $('#btn-back').style.display = dayNum !== realDay ? '' : 'none';
+    showSummaryContent();
+    showScreen('summary');
+  }
+
+  function showSummaryContent() {
     resetTheme();
 
-    const roundsEl = $('#summary-rounds');
+    var roundsEl = $('#summary-rounds');
     roundsEl.textContent = '';
 
     state.results.forEach(function (r) {
-      const row = el('div', 'summary-round');
+      var row = el('div', 'summary-round');
 
-      const swatch = el('div', 'summary-swatch');
+      var swatch = el('div', 'summary-swatch');
       swatch.style.backgroundColor = r.target.hex;
 
-      const nameWrap = el('div', 'summary-name');
+      var nameWrap = el('div', 'summary-name');
       nameWrap.appendChild(el('div', 'summary-target-name', r.target.name));
       nameWrap.appendChild(el('div', 'summary-source', r.target.src));
       nameWrap.appendChild(el('div', 'summary-guess-name', r.guess + ' \u2192 ' + r.matched.name));
 
-      const score = el('div', 'summary-score ' + scoreClass(r.total, 200), String(r.total));
+      var score = el('div', 'summary-score ' + scoreClass(r.total, 200), String(r.total));
 
       row.appendChild(swatch);
       row.appendChild(nameWrap);
@@ -368,11 +525,11 @@
       roundsEl.appendChild(row);
     });
 
-    const maxName = state.results.length * 100;
-    const maxHSB = state.results.length * 100;
-    const maxTotal = state.results.length * 200;
+    var maxName = state.results.length * 100;
+    var maxHSB = state.results.length * 100;
+    var maxTotal = state.results.length * 200;
 
-    const totalsEl = $('#summary-totals');
+    var totalsEl = $('#summary-totals');
     totalsEl.textContent = '';
 
     [
@@ -381,35 +538,25 @@
       ['Total', state.totalScore, maxTotal],
     ].forEach(function (item) {
       var label = item[0], value = item[1], max = item[2];
-      const d = el('div', 'summary-total-item');
+      var d = el('div', 'summary-total-item');
       d.appendChild(el('div', 'summary-total-label', label));
       d.appendChild(el('div', 'summary-total-value ' + scoreClass(value, max), value + '/' + max));
       totalsEl.appendChild(d);
     });
-
-    if (state.mode === 'daily') {
-      $('#summary-title').textContent = 'Colourdle #' + getDailyNumber();
-    } else {
-      $('#summary-title').textContent = 'Infinite \u2014 ' + state.results.length + ' rounds';
-    }
-
-    showScreen('summary');
   }
 
   // ----------------------------------------------------------
   // Share
   // ----------------------------------------------------------
   function generateShareText() {
-    const dayNum = state.mode === 'daily' ? getDailyNumber() : null;
-    const title = dayNum
-      ? 'Colourdle #' + dayNum
-      : 'Colourdle Infinite (' + state.results.length + ' rounds)';
+    // Use the title already displayed in summary (handles history views correctly)
+    var title = $('#summary-title').textContent;
 
-    const emojiGrid = state.results
+    var emojiGrid = state.results
       .map(function (r) { return scoreEmoji(r.nameScore, 100) + scoreEmoji(r.hsbScore, 100); })
       .join('\n');
 
-    return title + '\n' + emojiGrid + '\nScore: ' + state.totalScore + '/' + (state.results.length * 200);
+    return title + '\n' + emojiGrid + '\nScore: ' + state.totalScore + '/' + (state.results.length * 200) + '\nhttps://colourdle.ca';
   }
 
   function share() {
@@ -438,7 +585,19 @@
   $('#btn-share').addEventListener('click', share);
   $('#btn-play-again').addEventListener('click', function () {
     resetTheme();
+    renderHistory();
     showScreen('start');
+  });
+
+  $('#btn-back').addEventListener('click', function () {
+    viewingHistory = false;
+    resetTheme();
+    renderHistory();
+    showScreen('start');
+  });
+
+  $('#btn-finish').addEventListener('click', function () {
+    showSummary();
   });
 
   $('#guess-input').addEventListener('keydown', function (e) {
@@ -460,5 +619,30 @@
     resetTheme();
     showScreen('start');
   });
+
+  // ----------------------------------------------------------
+  // Dark mode
+  // ----------------------------------------------------------
+  function applyDarkMode(dark) {
+    document.documentElement.classList.toggle('dark', dark);
+    $('#btn-theme').textContent = dark ? 'Light' : 'Dark';
+    var store = loadStorage();
+    store.dark = dark;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  }
+
+  $('#btn-theme').addEventListener('click', function () {
+    applyDarkMode(!isDark());
+  });
+
+  // ----------------------------------------------------------
+  // Init
+  // ----------------------------------------------------------
+  (function () {
+    var store = loadStorage();
+    var prefersDark = store.dark != null ? store.dark : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    applyDarkMode(prefersDark);
+  })();
+  renderHistory();
 
 })();
