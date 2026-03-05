@@ -35,16 +35,26 @@
         <span class="nav">
           <button id="btn-daily" class="mode-btn active">Daily</button>
           <button id="btn-infinite" class="mode-btn">Infinite</button>
-          <button id="btn-theme" class="mode-btn" title="Toggle dark mode">Dark</button>
+          <button id="btn-iterative" class="mode-btn">Iterative</button>
         </span>
       </div>
       <div class="fill-centre">
         <p class="hero">Name that colour.</p>
         <p class="sub">5 colours. Guess each name.<br>Score by name + colour proximity.</p>
+        <div class="palette-select">
+          <select id="palette">
+            <option value="All">All colours</option>
+            <option value="Crayola">Crayola</option>
+            <option value="Pantone">Pantone</option>
+            <option value="XKCD">XKCD</option>
+            <option value="Japanese">Japanese</option>
+            <option value="RAL">RAL</option>
+          </select>
+        </div>
         <button id="btn-start" class="btn">Play</button>
         <div id="history" class="history"></div>
       </div>
-      <div class="credit">by <a href="https://entropist.ca" target="_blank" rel="noopener">Drew Brereton</a> · <a href="https://github.com/aebrer/colourdle" target="_blank" rel="noopener">source</a></div>
+      <div class="credit">by <a href="https://entropist.ca" target="_blank" rel="noopener">Drew Brereton</a> · <a href="https://github.com/aebrer/colourdle" target="_blank" rel="noopener">source</a> · <button id="btn-theme" class="credit-btn" title="Toggle dark mode">&#9790;</button></div>
     </div>
 
     <!-- Game screen -->
@@ -59,6 +69,23 @@
           <input type="text" id="guess-input" placeholder="..." autocomplete="off" autocapitalize="off" spellcheck="false">
           <button id="btn-guess" class="btn">&rarr;</button>
         </div>
+        <div id="iter-feedback" class="iter-feedback" style="display:none">
+          <div id="iter-best" class="iter-highlight" style="display:none">
+            <span class="iter-highlight-label">Best</span>
+            <div id="iter-best-swatch" class="inline-swatch"></div>
+            <span id="iter-best-name" class="guess-name"></span>
+            <span id="iter-best-score" class="iter-highlight-score"></span>
+          </div>
+          <div id="iter-last" class="iter-highlight">
+            <span class="iter-highlight-label">Last</span>
+            <div id="iter-last-swatch" class="inline-swatch"></div>
+            <span id="iter-last-name" class="guess-name"></span>
+            <span id="iter-last-score" class="iter-highlight-score"></span>
+          </div>
+          <div id="iter-log" class="iter-log"></div>
+          <div id="iter-status" class="iter-guess-count"></div>
+        </div>
+        <button id="btn-done" class="btn" style="display:none">Done</button>
         <button id="btn-finish" class="btn dim" style="display:none">Finish</button>
       </div>
     </div>
