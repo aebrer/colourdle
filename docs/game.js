@@ -526,6 +526,7 @@
   function iterativeDone() {
     if (!state.iterBest) return;
     var best = state.iterBest;
+    state.iterBest = null; // prevent double-fire
     best.guesses = state.iterGuessCount;
     state.results.push(best);
     state.totalName += best.nameScore;
@@ -810,7 +811,8 @@
     var store = loadStorage();
     if (store.palette) {
       $('#palette').value = store.palette;
-      state.palette = store.palette;
+      // Read back actual value — select ignores invalid options
+      state.palette = $('#palette').value;
     }
     var prefersDark = store.dark != null ? store.dark : window.matchMedia('(prefers-color-scheme: dark)').matches;
     applyDarkMode(prefersDark);
