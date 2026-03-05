@@ -24,8 +24,8 @@ export default {
     }
 
     // Also allow localhost for dev
-    if (origin && origin !== env.ALLOWED_ORIGIN && !origin.startsWith('http://localhost')) {
-      cors['Access-Control-Allow-Origin'] = env.ALLOWED_ORIGIN;
+    if (origin && origin.startsWith('http://localhost')) {
+      cors['Access-Control-Allow-Origin'] = origin;
     }
 
     const json = (data, status = 200) =>
@@ -64,14 +64,11 @@ export default {
 
         // For POST: add the score
         if (request.method === 'POST') {
-          // Cap at 10k entries per day-key to prevent abuse
-          if (scores.length < 10000) {
-            scores.push(score);
-            await env.SCORES.put(kvKey, JSON.stringify(scores), {
-              // Auto-expire after 48 hours (covers all timezones)
-              expirationTtl: 60 * 60 * 48,
-            });
-          }
+          scores.push(score);
+          await env.SCORES.put(kvKey, JSON.stringify(scores), {
+            // Auto-expire after 48 hours (covers all timezones)
+            expirationTtl: 60 * 60 * 48,
+          });
         }
 
         // Calculate percentile
@@ -89,6 +86,7 @@ export default {
 
       return json({ error: 'Not found' }, 404);
     } catch (e) {
+      console.error('Worker error:', e.message);
       return json({ error: 'Internal error' }, 500);
     }
   },

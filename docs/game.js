@@ -272,6 +272,12 @@
     }
   }
 
+  function persistStorage(store) {
+    try {
+      persistStorage(store);
+    } catch (e) { /* storage full — game continues, data just won't persist */ }
+  }
+
   function dailyKey(dayNum, palette, type) {
     // Backward-compatible: classic+All = just dayNum
     var key = String(dayNum);
@@ -305,7 +311,7 @@
       totalHSB: totals.hsb,
       totalScore: totals.score,
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    persistStorage(store);
   }
 
   function getDailyResult(dayNum, palette, type) {
@@ -321,7 +327,7 @@
     if (store.days[key]) {
       store.days[key].percentile = percentile;
       store.days[key].percentileTotal = total;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+      persistStorage(store);
     }
   }
 
@@ -570,22 +576,8 @@
     }
   }
 
-  // ----------------------------------------------------------
-  // Mode label helpers
-  // ----------------------------------------------------------
-  function modeLabel() {
-    var parts = [];
-    if (state.timing === 'freeplay') parts.push('Freeplay');
-    if (state.type === 'explore') parts.push('Explore');
-    return parts.length > 0 ? parts.join(' ') : '';
-  }
-
   function showSummary() {
     state.playing = false;
-    viewingHistory = false;
-
-    // Max score uses base 100 per round (bonus can exceed it)
-    var maxScore = state.results.length * 100;
 
     if (state.timing === 'daily') {
       var dayNum = getDailyNumber();
@@ -623,27 +615,36 @@
     var pctEl = $('#percentile');
     pctEl.style.display = 'none';
     if (state.timing === 'daily') {
-      var dayNum = getDailyNumber();
-      var saved = getDailyResult(dayNum, state.palette, state.type);
-      if (saved && saved.percentile != null) {
-        // Show cached percentile
-        showPercentile(saved.percentile, saved.percentileTotal);
-      } else if (!viewingHistory) {
-        // Fetch fresh percentile
-        var key = dailyKey(dayNum, state.palette, state.type);
-        fetchPercentile(key, state.totalScore).then(function (data) {
-          if (data && data.total > 0) {
-            savePercentile(dayNum, state.palette, state.type, data.percentile, data.total);
-            showPercentile(data.percentile, data.total);
-          }
-        });
+      if (isPerfectScore()) {
+        // Perfect scores get a special message and are not submitted
+        showPercentile(100, 0);
+      } else {
+        var dayNum = getDailyNumber();
+        var saved = getDailyResult(dayNum, state.palette, state.type);
+        if (saved && saved.percentile != null) {
+          showPercentile(saved.percentile, saved.percentileTotal);
+        } else {
+          var key = dailyKey(dayNum, state.palette, state.type);
+          fetchPercentile(key, state.totalScore).then(function (data) {
+            if (data && data.total > 0) {
+              savePercentile(dayNum, state.palette, state.type, data.percentile, data.total);
+              showPercentile(data.percentile, data.total);
+            }
+          });
+        }
       }
     }
   }
 
+  function isPerfectScore() {
+    return state.totalScore >= state.results.length * 200;
+  }
+
   function showPercentile(percentile, total) {
     var pctEl = $('#percentile');
-    if (total < 2) {
+    if (isPerfectScore()) {
+      pctEl.textContent = 'You are the best to ever do it.';
+    } else if (total < 2) {
       pctEl.textContent = 'First score recorded today!';
     } else {
       pctEl.textContent = 'Better than ' + percentile + '% of ' + total + ' players';
@@ -831,6 +832,19 @@
       var toast = $('#share-toast');
       toast.classList.add('show');
       setTimeout(function () { toast.classList.remove('show'); }, 2000);
+    }).catch(function () {
+      // Fallback: select from a temporary textarea
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      var toast = $('#share-toast');
+      toast.classList.add('show');
+      setTimeout(function () { toast.classList.remove('show'); }, 2000);
     });
   }
 
@@ -912,7 +926,7 @@
     $('#btn-theme').textContent = dark ? '\u2600' : '\u263E';
     var store = loadStorage();
     store.dark = dark;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    persistStorage(store);
   }
 
   $('#btn-theme').addEventListener('click', function () {
