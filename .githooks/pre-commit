@@ -1,0 +1,13 @@
+#!/bin/sh
+# Cache-bust asset URLs in HTML files before each commit.
+# Stamps a unix timestamp into all ?v= params so Cloudflare
+# and browsers always fetch fresh assets after a deploy.
+
+stamp=$(date +%s)
+
+for f in docs/index.html docs/about.html; do
+  if [ -f "$f" ] && git diff --cached --name-only | grep -q "$f"; then
+    sed -i "s/\?v=[^\"']*/\?v=$stamp/g" "$f"
+    git add "$f"
+  fi
+done
