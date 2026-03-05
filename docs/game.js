@@ -274,7 +274,7 @@
 
   function persistStorage(store) {
     try {
-      persistStorage(store);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
     } catch (e) { /* storage full — game continues, data just won't persist */ }
   }
 
