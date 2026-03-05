@@ -65,6 +65,10 @@ body {
   cursor: pointer;
   padding: 0;
 }
+.chrome-home::before {
+  content: '\2302';
+  margin-right: 6px;
+}
 .chrome-home:hover {
   text-decoration: underline;
 }
