@@ -308,7 +308,8 @@
     $('#result-target').style.backgroundColor = result.target.hex;
     $('#result-target-name').textContent = result.target.name;
     $('#result-guess').style.backgroundColor = result.matched.hex;
-    $('#result-guess-name').textContent = result.guess + ' \u2192 ' + result.matched.name;
+    $('#result-guess-name').textContent = '"' + result.guess + '" \u2192 ' + result.matched.name;
+    $('#hint-hsb').textContent = 'How close is "' + result.matched.name + '" to the colour?';
 
     const barName = $('#bar-name');
     const barHSB = $('#bar-hsb');
@@ -385,7 +386,7 @@
 
     [
       ['Name', state.totalName, maxName],
-      ['HSB', state.totalHSB, maxHSB],
+      ['Colour', state.totalHSB, maxHSB],
       ['Total', state.totalScore, maxTotal],
     ].forEach(([label, value, max]) => {
       const item = el('div', 'summary-total-item');

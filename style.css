@@ -215,6 +215,15 @@ nav {
   box-shadow: 0 4px 20px #00000044;
 }
 
+.swatch-header {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
 .swatch-label {
   display: block;
   margin-top: 8px;
@@ -237,11 +246,19 @@ nav {
 }
 
 .score-label {
-  width: 50px;
+  width: 55px;
   font-size: 0.85rem;
   color: var(--text-dim);
   text-align: right;
   flex-shrink: 0;
+}
+
+.score-hint {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  opacity: 0.6;
+  flex-shrink: 0;
+  width: 90px;
 }
 
 .score-bar-container {

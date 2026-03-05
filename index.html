@@ -43,10 +43,12 @@
       <div class="result-colours">
         <div class="result-swatch-pair">
           <div>
+            <span class="swatch-header">The colour was</span>
             <div id="result-target" class="result-swatch"></div>
             <span id="result-target-name" class="swatch-label">Target</span>
           </div>
           <div>
+            <span class="swatch-header">The colour you named</span>
             <div id="result-guess" class="result-swatch"></div>
             <span id="result-guess-name" class="swatch-label">Your guess</span>
           </div>
@@ -55,13 +57,15 @@
       <div class="result-scores">
         <div class="score-row">
           <span class="score-label">Name</span>
+          <span class="score-hint">How close is your guess to the name?</span>
           <div class="score-bar-container">
             <div id="bar-name" class="score-bar"></div>
           </div>
           <span id="score-name" class="score-value">0</span>
         </div>
         <div class="score-row">
-          <span class="score-label">HSB</span>
+          <span class="score-label">Colour</span>
+          <span id="hint-hsb" class="score-hint">How close is the colour you named?</span>
           <div class="score-bar-container">
             <div id="bar-hsb" class="score-bar"></div>
           </div>
@@ -69,6 +73,7 @@
         </div>
         <div class="score-row total">
           <span class="score-label">Total</span>
+          <span class="score-hint"></span>
           <div class="score-bar-container">
             <div id="bar-total" class="score-bar"></div>
           </div>
