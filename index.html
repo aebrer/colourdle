@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Colourdle</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Colourdle</h1>
+      <nav>
+        <button id="btn-daily" class="mode-btn active">Daily</button>
+        <button id="btn-infinite" class="mode-btn">Infinite</button>
+      </nav>
+    </header>
+
+    <!-- Start screen -->
+    <div id="screen-start" class="screen active">
+      <div class="start-content">
+        <p class="tagline">Name that colour.</p>
+        <p class="subtitle">You'll see 5 colours. Guess each one's name.<br>Score by name accuracy and colour proximity.</p>
+        <button id="btn-start" class="big-btn">Play</button>
+      </div>
+    </div>
+
+    <!-- Game screen -->
+    <div id="screen-game" class="screen">
+      <div class="round-info">
+        <span id="round-counter">1 / 5</span>
+        <span id="running-score">Score: 0</span>
+      </div>
+      <div id="colour-swatch"></div>
+      <div class="input-area">
+        <input type="text" id="guess-input" placeholder="Type a colour name..." autocomplete="off" autocapitalize="off" spellcheck="false">
+        <button id="btn-guess" class="big-btn">Guess</button>
+      </div>
+    </div>
+
+    <!-- Result screen (shown after each guess) -->
+    <div id="screen-result" class="screen">
+      <div class="result-colours">
+        <div class="result-swatch-pair">
+          <div>
+            <div id="result-target" class="result-swatch"></div>
+            <span id="result-target-name" class="swatch-label">Target</span>
+          </div>
+          <div>
+            <div id="result-guess" class="result-swatch"></div>
+            <span id="result-guess-name" class="swatch-label">Your guess</span>
+          </div>
+        </div>
+      </div>
+      <div class="result-scores">
+        <div class="score-row">
+          <span class="score-label">Name</span>
+          <div class="score-bar-container">
+            <div id="bar-name" class="score-bar"></div>
+          </div>
+          <span id="score-name" class="score-value">0</span>
+        </div>
+        <div class="score-row">
+          <span class="score-label">HSB</span>
+          <div class="score-bar-container">
+            <div id="bar-hsb" class="score-bar"></div>
+          </div>
+          <span id="score-hsb" class="score-value">0</span>
+        </div>
+        <div class="score-row total">
+          <span class="score-label">Total</span>
+          <div class="score-bar-container">
+            <div id="bar-total" class="score-bar"></div>
+          </div>
+          <span id="score-total" class="score-value">0</span>
+        </div>
+      </div>
+      <button id="btn-next" class="big-btn">Next</button>
+    </div>
+
+    <!-- Summary screen (end of daily) -->
+    <div id="screen-summary" class="screen">
+      <h2 id="summary-title">Results</h2>
+      <div id="summary-rounds"></div>
+      <div id="summary-totals" class="summary-totals"></div>
+      <button id="btn-share" class="big-btn">Share</button>
+      <button id="btn-play-again" class="big-btn secondary">Play Again</button>
+      <div id="share-toast" class="toast">Copied to clipboard!</div>
+    </div>
+  </div>
+
+  <script src="colors.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
