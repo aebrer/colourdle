@@ -396,6 +396,94 @@ body {
   transform: translateX(-50%) translateY(0);
 }
 
+/* Iterative feedback */
+.iter-feedback {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--fg-dim);
+}
+.iter-highlight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 4px 0;
+}
+.iter-highlight-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fg-dim);
+  width: 32px;
+  flex-shrink: 0;
+}
+.iter-highlight-score {
+  margin-left: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.iter-log {
+  max-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-top: 1px solid var(--fg-dim);
+  padding-top: 6px;
+}
+.iter-log-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 3px 0;
+  color: var(--fg-dim);
+}
+.iter-log-entry .inline-swatch {
+  width: 16px;
+  height: 16px;
+}
+.iter-log-num {
+  width: 18px;
+  text-align: right;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.iter-log-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.iter-log-score {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.iter-guess-count {
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+
+/* Palette select */
+.palette-select select {
+  font-family: var(--mono);
+  font-size: 13px;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--fg-dim);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.palette-select select:focus {
+  outline: none;
+  border-color: var(--fg);
+}
+
 /* Credit */
 .credit {
   padding: 12px 20px;
@@ -408,9 +496,20 @@ body {
   text-decoration: none;
   border-bottom: 1px solid var(--fg-dim);
 }
-.credit a:hover {
+.credit a:hover,
+.credit-btn:hover {
   color: var(--fg);
   border-color: var(--fg);
+}
+.credit-btn {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--fg-dim);
+  color: var(--fg-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
 }
 
 /* History */

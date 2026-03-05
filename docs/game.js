@@ -143,10 +143,11 @@
   }
 
   function findBestMatch(guess) {
+    var pool = state.palette === 'All' ? COLOURS : getPool();
     const normalized = guess.toLowerCase().trim();
     let bestScore = -1;
     let bestColour = null;
-    for (const c of COLOURS) {
+    for (const c of pool) {
       const score = stringSimilarity(normalized, c.name);
       if (score > bestScore) {
         bestScore = score;
@@ -181,11 +182,23 @@
   }
 
   // ----------------------------------------------------------
+  // Palette filtering
+  // ----------------------------------------------------------
+  function getPool() {
+    var palette = state.palette;
+    if (palette === 'All') return COLOURS;
+    return COLOURS.filter(function (c) { return c.src === palette; });
+  }
+
+  // ----------------------------------------------------------
   // Game state
   // ----------------------------------------------------------
   const ROUNDS_DAILY = 5;
+  const ROUNDS_ITERATIVE = 5;
+  const MAX_ITER_GUESSES = 10;
   let state = {
     mode: 'daily',
+    palette: 'All',
     round: 0,
     colours: [],
     results: [],
@@ -193,6 +206,10 @@
     totalHSB: 0,
     totalScore: 0,
     playing: false,
+    // Iterative mode state
+    iterGuessCount: 0,
+    iterBest: null,
+    iterLast: null,
   };
 
   function getDailyNumber() {
@@ -203,22 +220,24 @@
   }
 
   function pickDailyColours() {
-    const seed = hashString('colourdle-' + getDailyNumber());
+    var pool = getPool();
+    const seed = hashString('colourdle-' + state.palette + '-' + getDailyNumber());
     const rng = mulberry32(seed);
     const picked = [];
     const used = new Set();
     while (picked.length < ROUNDS_DAILY) {
-      const idx = Math.floor(rng() * COLOURS.length);
+      const idx = Math.floor(rng() * pool.length);
       if (!used.has(idx)) {
         used.add(idx);
-        picked.push(COLOURS[idx]);
+        picked.push(pool[idx]);
       }
     }
     return picked;
   }
 
   function pickRandomColour() {
-    return COLOURS[Math.floor(Math.random() * COLOURS.length)];
+    var pool = getPool();
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   // ----------------------------------------------------------
@@ -252,10 +271,15 @@
     }
   }
 
-  function saveDaily(dayNum, results, totals) {
+  function dailyKey(dayNum, palette) {
+    return palette === 'All' ? String(dayNum) : dayNum + ':' + palette;
+  }
+
+  function saveDaily(dayNum, palette, results, totals) {
     var store = loadStorage();
     if (!store.days) store.days = {};
-    store.days[dayNum] = {
+    store.days[dailyKey(dayNum, palette)] = {
+      palette: palette,
       results: results.map(function (r) {
         return {
           targetName: r.target.name,
@@ -268,6 +292,7 @@
           nameScore: r.nameScore,
           hsbScore: r.hsbScore,
           total: r.total,
+          guesses: r.guesses || undefined,
         };
       }),
       totalName: totals.name,
@@ -277,9 +302,10 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
   }
 
-  function getDailyResult(dayNum) {
+  function getDailyResult(dayNum, palette) {
     var store = loadStorage();
-    return store.days && store.days[dayNum] || null;
+    var key = palette != null ? dailyKey(dayNum, palette) : String(dayNum);
+    return store.days && store.days[key] || null;
   }
 
   function getAllDailyResults() {
@@ -297,6 +323,7 @@
         nameScore: r.nameScore,
         hsbScore: r.hsbScore,
         total: r.total,
+        guesses: r.guesses || undefined,
       };
     });
   }
@@ -305,9 +332,11 @@
   // Game flow
   // ----------------------------------------------------------
   function startGame() {
+    state.palette = $('#palette').value;
+
     // If daily already completed, show saved summary
     if (state.mode === 'daily') {
-      var saved = getDailyResult(getDailyNumber());
+      var saved = getDailyResult(getDailyNumber(), state.palette);
       if (saved) {
         state.results = savedToResults(saved);
         state.totalName = saved.totalName;
@@ -325,7 +354,10 @@
     state.totalHSB = 0;
     state.totalScore = 0;
     state.playing = true;
-    if (state.mode === 'daily') {
+    state.iterGuessCount = 0;
+    state.iterBest = null;
+    state.iterLast = null;
+    if (state.mode === 'daily' || state.mode === 'iterative') {
       state.colours = pickDailyColours();
     } else {
       state.colours = [];
@@ -335,7 +367,7 @@
 
   function showRound() {
     let target;
-    if (state.mode === 'daily') {
+    if (state.mode === 'daily' || state.mode === 'iterative') {
       target = state.colours[state.round];
     } else {
       target = pickRandomColour();
@@ -343,7 +375,10 @@
     }
 
     const roundNum = state.round + 1;
-    const total = state.mode === 'daily' ? ROUNDS_DAILY : '\u221E';
+    var total;
+    if (state.mode === 'daily') total = ROUNDS_DAILY;
+    else if (state.mode === 'iterative') total = ROUNDS_ITERATIVE;
+    else total = '\u221E';
     $('#round-counter').textContent = roundNum + ' / ' + total;
     $('#running-score').textContent = state.totalScore;
     $('#game-source').textContent = target.src;
@@ -352,9 +387,28 @@
     // Show finish button in infinite mode after at least 1 round
     $('#btn-finish').style.display = (state.mode === 'infinite' && state.round > 0) ? '' : 'none';
 
+    // Reset iterative state for this round
+    state.iterGuessCount = 0;
+    state.iterBest = null;
+    state.iterLast = null;
+    $('#iter-feedback').style.display = 'none';
+    $('#btn-done').style.display = 'none';
+    $('#iter-log').textContent = '';
+    $('#iter-best').style.display = 'none';
+
     setTheme(target.hex);
     showScreen('game');
     setTimeout(function () { $('#guess-input').focus(); }, 100);
+  }
+
+  function computeRoundScore(input, target, match) {
+    var nameScore = stringSimilarity(input, target.name);
+    var hsbScore = Math.round(colourScore(target.hex, match.colour.hex));
+    var exactMatch = match.colour.hex === target.hex;
+    var p = 3;
+    var roundTotal = Math.round(Math.pow((Math.pow(nameScore, p) + Math.pow(hsbScore, p)) / 2, 1 / p));
+    if (exactMatch) roundTotal = roundTotal * 2;
+    return { nameScore: nameScore, hsbScore: hsbScore, total: roundTotal };
   }
 
   function submitGuess() {
@@ -363,31 +417,82 @@
 
     const target = state.colours[state.round];
     const match = findBestMatch(input);
+    var scores = computeRoundScore(input, target, match);
 
-    const nameScore = stringSimilarity(input, target.name);
-    const hsbScore = Math.round(colourScore(target.hex, match.colour.hex));
+    if (state.mode === 'iterative') {
+      state.iterGuessCount++;
 
-    // Exact colour match bonus (2x) — matched the exact same colour entry
-    const exactMatch = match.colour.hex === target.hex;
+      var thisGuess = {
+        target: target,
+        guess: input,
+        matched: match.colour,
+        nameScore: scores.nameScore,
+        hsbScore: scores.hsbScore,
+        total: scores.total,
+      };
 
-    // Power mean (p=3) — favours the higher of the two scores
-    const p = 3;
-    var roundTotal = Math.round(Math.pow((Math.pow(nameScore, p) + Math.pow(hsbScore, p)) / 2, 1 / p));
-    if (exactMatch) roundTotal = roundTotal * 2;
+      state.iterLast = thisGuess;
+      if (!state.iterBest || scores.total > state.iterBest.total) {
+        state.iterBest = thisGuess;
+      }
+
+      // Update "Last" highlight
+      $('#iter-last-swatch').style.backgroundColor = match.colour.hex;
+      $('#iter-last-name').textContent = input + ' \u2192 ' + match.colour.name;
+      $('#iter-last-score').textContent = scores.total;
+
+      // Update "Best" highlight (show only if different from last)
+      if (state.iterBest !== state.iterLast) {
+        $('#iter-best').style.display = '';
+        $('#iter-best-swatch').style.backgroundColor = state.iterBest.matched.hex;
+        $('#iter-best-name').textContent = state.iterBest.guess + ' \u2192 ' + state.iterBest.matched.name;
+        $('#iter-best-score').textContent = state.iterBest.total;
+      } else {
+        $('#iter-best').style.display = 'none';
+      }
+
+      // Add to scrollable log
+      var logEntry = el('div', 'iter-log-entry');
+      logEntry.appendChild(el('span', 'iter-log-num', String(state.iterGuessCount)));
+      var sw = el('div', 'inline-swatch');
+      sw.style.backgroundColor = match.colour.hex;
+      logEntry.appendChild(sw);
+      logEntry.appendChild(el('span', 'iter-log-name', input + ' \u2192 ' + match.colour.name));
+      logEntry.appendChild(el('span', 'iter-log-score', String(scores.total)));
+      var logEl = $('#iter-log');
+      logEl.insertBefore(logEntry, logEl.firstChild);
+
+      // Status line
+      var remaining = MAX_ITER_GUESSES - state.iterGuessCount;
+      $('#iter-status').textContent = remaining + ' guess' + (remaining !== 1 ? 'es' : '') + ' remaining';
+
+      $('#iter-feedback').style.display = '';
+      $('#btn-done').style.display = '';
+
+      // Auto-done at max guesses
+      if (state.iterGuessCount >= MAX_ITER_GUESSES) {
+        iterativeDone();
+        return;
+      }
+
+      $('#guess-input').value = '';
+      $('#guess-input').focus();
+      return;
+    }
 
     state.results.push({
       target: target,
       guess: input,
       matched: match.colour,
       matchSimilarity: match.similarity,
-      nameScore: nameScore,
-      hsbScore: hsbScore,
-      total: roundTotal,
+      nameScore: scores.nameScore,
+      hsbScore: scores.hsbScore,
+      total: scores.total,
     });
 
-    state.totalName += nameScore;
-    state.totalHSB += hsbScore;
-    state.totalScore += roundTotal;
+    state.totalName += scores.nameScore;
+    state.totalHSB += scores.hsbScore;
+    state.totalScore += scores.total;
 
     showResult(state.results[state.results.length - 1]);
   }
@@ -411,15 +516,31 @@
     $('#score-hsb').className = 'score-val ' + scoreClass(result.hsbScore, 100);
     $('#score-total').className = 'score-val ' + scoreClass(result.total, 200);
 
-    const isLast = state.mode === 'daily' && state.round >= ROUNDS_DAILY - 1;
+    var isLast = (state.mode === 'daily' && state.round >= ROUNDS_DAILY - 1) ||
+                 (state.mode === 'iterative' && state.round >= ROUNDS_ITERATIVE - 1);
     $('#btn-next').textContent = isLast ? 'Results' : 'Next';
 
     showScreen('result');
   }
 
+  function iterativeDone() {
+    if (!state.iterBest) return;
+    var best = state.iterBest;
+    state.iterBest = null; // prevent double-fire
+    best.guesses = state.iterGuessCount;
+    state.results.push(best);
+    state.totalName += best.nameScore;
+    state.totalHSB += best.hsbScore;
+    state.totalScore += best.total;
+
+    // Show result screen with target reveal (reuse existing result screen)
+    showResult(best);
+  }
+
   function nextRound() {
     state.round++;
-    if (state.mode === 'daily' && state.round >= ROUNDS_DAILY) {
+    if ((state.mode === 'daily' && state.round >= ROUNDS_DAILY) ||
+        (state.mode === 'iterative' && state.round >= ROUNDS_ITERATIVE)) {
       showSummary();
     } else {
       showRound();
@@ -432,16 +553,21 @@
 
     if (state.mode === 'daily') {
       var dayNum = getDailyNumber();
-      $('#summary-title').textContent = 'Colourdle #' + dayNum;
+      var paletteSuffix = state.palette !== 'All' ? ' (' + state.palette + ')' : '';
+      $('#summary-title').textContent = 'Colourdle #' + dayNum + paletteSuffix;
       $('#btn-back').style.display = 'none';
       // Persist daily results
-      if (!getDailyResult(dayNum)) {
-        saveDaily(dayNum, state.results, {
+      if (!getDailyResult(dayNum, state.palette)) {
+        saveDaily(dayNum, state.palette, state.results, {
           name: state.totalName,
           hsb: state.totalHSB,
           score: state.totalScore,
         });
       }
+    } else if (state.mode === 'iterative') {
+      var totalGuesses = state.results.reduce(function (sum, r) { return sum + (r.guesses || 1); }, 0);
+      $('#summary-title').textContent = 'Iterative \u2014 ' + totalGuesses + ' guesses';
+      $('#btn-back').style.display = 'none';
     } else {
       $('#summary-title').textContent = 'Infinite \u2014 ' + state.results.length + ' rounds';
       $('#btn-back').style.display = 'none';
@@ -456,46 +582,59 @@
   // ----------------------------------------------------------
   var viewingHistory = false;
 
+  function parseHistoryKey(key) {
+    var parts = key.split(':');
+    return { dayNum: parseInt(parts[0], 10), palette: parts[1] || 'All' };
+  }
+
   function renderHistory() {
     var historyEl = $('#history');
     historyEl.textContent = '';
     var days = getAllDailyResults();
-    var dayNums = Object.keys(days).map(Number).sort(function (a, b) { return b - a; });
-    if (dayNums.length === 0) return;
+    var keys = Object.keys(days).sort(function (a, b) {
+      return parseHistoryKey(b).dayNum - parseHistoryKey(a).dayNum;
+    });
+    if (keys.length === 0) return;
 
     historyEl.appendChild(el('div', 'history-title', 'History'));
 
-    dayNums.forEach(function (num) {
-      var day = days[num];
+    keys.forEach(function (key) {
+      var info = parseHistoryKey(key);
+      var day = days[key];
       var maxScore = day.results.length * 200;
       var row = el('button', 'history-row');
 
-      var label = el('span', 'history-label', '#' + num);
+      var labelText = '#' + info.dayNum;
+      if (info.palette !== 'All') labelText += ' (' + info.palette + ')';
+      var label = el('span', 'history-label', labelText);
       var score = el('span', 'history-score ' + scoreClass(day.totalScore, maxScore),
         day.totalScore + '/' + maxScore);
 
       row.appendChild(label);
       row.appendChild(score);
-      row.addEventListener('click', function () { viewDay(num); });
+      row.addEventListener('click', function () { viewDayByKey(key); });
       historyEl.appendChild(row);
     });
   }
 
-  function viewDay(dayNum) {
-    var saved = getDailyResult(dayNum);
+  function viewDayByKey(key) {
+    var store = loadStorage();
+    var saved = store.days && store.days[key] || null;
     if (!saved) return;
 
+    var info = parseHistoryKey(key);
     viewingHistory = true;
     state.results = savedToResults(saved);
     state.totalName = saved.totalName;
     state.totalHSB = saved.totalHSB;
     state.totalScore = saved.totalScore;
+    state.palette = info.palette;
     state.mode = 'daily';
 
-    // Temporarily override getDailyNumber for summary title
-    var realDay = getDailyNumber();
-    $('#summary-title').textContent = 'Colourdle #' + dayNum;
-    $('#btn-back').style.display = dayNum !== realDay ? '' : 'none';
+    var paletteSuffix = info.palette !== 'All' ? ' (' + info.palette + ')' : '';
+    var realKey = dailyKey(getDailyNumber(), state.palette);
+    $('#summary-title').textContent = 'Colourdle #' + info.dayNum + paletteSuffix;
+    $('#btn-back').style.display = key !== realKey ? '' : 'none';
     showSummaryContent();
     showScreen('summary');
   }
@@ -515,7 +654,9 @@
       var nameWrap = el('div', 'summary-name');
       nameWrap.appendChild(el('div', 'summary-target-name', r.target.name));
       nameWrap.appendChild(el('div', 'summary-source', r.target.src));
-      nameWrap.appendChild(el('div', 'summary-guess-name', r.guess + ' \u2192 ' + r.matched.name));
+      var guessText = r.guess + ' \u2192 ' + r.matched.name;
+      if (r.guesses) guessText += ' (' + r.guesses + (r.guesses === 1 ? ' guess' : ' guesses') + ')';
+      nameWrap.appendChild(el('div', 'summary-guess-name', guessText));
 
       var score = el('div', 'summary-score ' + scoreClass(r.total, 200), String(r.total));
 
@@ -553,7 +694,11 @@
     var title = $('#summary-title').textContent;
 
     var emojiGrid = state.results
-      .map(function (r) { return scoreEmoji(r.nameScore, 100) + scoreEmoji(r.hsbScore, 100); })
+      .map(function (r) {
+        var line = scoreEmoji(r.nameScore, 100) + scoreEmoji(r.hsbScore, 100);
+        if (r.guesses) line += ' (' + r.guesses + ')';
+        return line;
+      })
       .join('\n');
 
     return title + '\n' + emojiGrid + '\nScore: ' + state.totalScore + '/' + (state.results.length * 200) + '\nhttps://colourdle.ca';
@@ -600,6 +745,8 @@
     showSummary();
   });
 
+  $('#btn-done').addEventListener('click', iterativeDone);
+
   function goHome() {
     resetTheme();
     renderHistory();
@@ -619,21 +766,19 @@
     else if (active.id === 'screen-start') startGame();
   });
 
-  $('#btn-daily').addEventListener('click', function () {
-    state.mode = 'daily';
-    $('#btn-daily').classList.add('active');
-    $('#btn-infinite').classList.remove('active');
+  function setMode(mode) {
+    state.mode = mode;
+    ['daily', 'infinite', 'iterative'].forEach(function (m) {
+      $('#btn-' + m).classList.toggle('active', m === mode);
+    });
     resetTheme();
+    renderHistory();
     showScreen('start');
-  });
+  }
 
-  $('#btn-infinite').addEventListener('click', function () {
-    state.mode = 'infinite';
-    $('#btn-infinite').classList.add('active');
-    $('#btn-daily').classList.remove('active');
-    resetTheme();
-    showScreen('start');
-  });
+  $('#btn-daily').addEventListener('click', function () { setMode('daily'); });
+  $('#btn-infinite').addEventListener('click', function () { setMode('infinite'); });
+  $('#btn-iterative').addEventListener('click', function () { setMode('iterative'); });
 
   // ----------------------------------------------------------
   // Dark mode
@@ -642,7 +787,7 @@
     document.documentElement.classList.toggle('dark', dark);
     // Clear any inline style overrides so CSS class takes effect
     resetTheme();
-    $('#btn-theme').textContent = dark ? 'Light' : 'Dark';
+    $('#btn-theme').textContent = dark ? '\u2600' : '\u263E';
     var store = loadStorage();
     store.dark = dark;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
@@ -652,11 +797,23 @@
     applyDarkMode(!isDark());
   });
 
+  // Save palette preference on change
+  $('#palette').addEventListener('change', function () {
+    var store = loadStorage();
+    store.palette = this.value;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  });
+
   // ----------------------------------------------------------
   // Init
   // ----------------------------------------------------------
   (function () {
     var store = loadStorage();
+    if (store.palette) {
+      $('#palette').value = store.palette;
+      // Read back actual value — select ignores invalid options
+      state.palette = $('#palette').value;
+    }
     var prefersDark = store.dark != null ? store.dark : window.matchMedia('(prefers-color-scheme: dark)').matches;
     applyDarkMode(prefersDark);
   })();
