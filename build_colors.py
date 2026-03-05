@@ -394,7 +394,8 @@ def main():
     print("  Fetching XKCD survey colours...")
     add_source("XKCD", collect_xkcd())
 
-    add_source("Japanese", collect_japanese())
+    # Japanese removed — transliterated names don't work for English game
+    # add_source("Japanese", collect_japanese())
     add_source("RAL", collect_ral())
 
     # Sort alphabetically

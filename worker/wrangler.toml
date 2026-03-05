@@ -1,0 +1,10 @@
+name = "colourdle-scores"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding = "SCORES"
+id = "4969a3c6a31b4562a6271897e0ca6975"
+
+[vars]
+ALLOWED_ORIGIN = "https://colourdle.ca"
