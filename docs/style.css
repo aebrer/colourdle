@@ -55,6 +55,20 @@ body {
   gap: 12px;
 }
 
+.chrome-home {
+  background: none;
+  border: none;
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+}
+.chrome-home:hover {
+  text-decoration: underline;
+}
+
 .title {
   font-weight: 700;
   font-size: 16px;

@@ -600,8 +600,23 @@
     showSummary();
   });
 
-  $('#guess-input').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') submitGuess();
+  function goHome() {
+    resetTheme();
+    renderHistory();
+    showScreen('start');
+  }
+
+  document.querySelectorAll('.chrome-home').forEach(function (btn) {
+    btn.addEventListener('click', goHome);
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    var active = document.querySelector('.screen.active');
+    if (!active) return;
+    if (active.id === 'screen-game') submitGuess();
+    else if (active.id === 'screen-result') nextRound();
+    else if (active.id === 'screen-start') startGame();
   });
 
   $('#btn-daily').addEventListener('click', function () {
@@ -625,6 +640,8 @@
   // ----------------------------------------------------------
   function applyDarkMode(dark) {
     document.documentElement.classList.toggle('dark', dark);
+    // Clear any inline style overrides so CSS class takes effect
+    resetTheme();
     $('#btn-theme').textContent = dark ? 'Light' : 'Dark';
     var store = loadStorage();
     store.dark = dark;
