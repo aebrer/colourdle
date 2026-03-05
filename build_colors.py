@@ -415,10 +415,10 @@ def main():
 
     lines.append("];")
 
-    with open("colors.js", "w") as f:
+    with open("docs/colors.js", "w") as f:
         f.write('\n'.join(lines) + '\n')
 
-    print(f"Written to colors.js ({len(all_colours)} colours)")
+    print(f"Written to docs/colors.js ({len(all_colours)} colours)")
 
 if __name__ == '__main__':
     main()
