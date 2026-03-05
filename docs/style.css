@@ -75,6 +75,23 @@ body {
   letter-spacing: 0.05em;
 }
 
+.nav {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Button groups */
+.btn-group {
+  display: inline-flex;
+}
+.btn-group .mode-btn {
+  border-radius: 0;
+}
+.btn-group .mode-btn:first-child {
+  border-right: none;
+}
+
 /* Mode buttons */
 .mode-btn {
   background: none;
@@ -231,10 +248,28 @@ body {
   font-size: 13px;
 }
 
-.result-guess-info {
+.result-guess-left {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.guess-label {
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+.guess-label strong {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.result-guess-right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 /* Scores */
@@ -371,6 +406,15 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Percentile */
+.percentile {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg);
+  text-align: center;
+  padding: 8px 0;
+}
+
 .summary-actions {
   display: flex;
   gap: 12px;
@@ -469,8 +513,13 @@ body {
   color: var(--fg-dim);
 }
 
-/* Palette select */
-.palette-select select {
+/* Start options (type toggle + palette dropdown) */
+.start-options {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.start-options select {
   font-family: var(--mono);
   font-size: 13px;
   background: transparent;
@@ -479,7 +528,7 @@ body {
   padding: 6px 12px;
   cursor: pointer;
 }
-.palette-select select:focus {
+.start-options select:focus {
   outline: none;
   border-color: var(--fg);
 }

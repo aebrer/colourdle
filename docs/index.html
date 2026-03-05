@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=1772732852">
+  <link rel="stylesheet" href="style.css?v=1772749896">
 </head>
 <body>
   <div id="app">
@@ -33,24 +33,30 @@
       <div class="chrome top">
         <span class="title">Colourdle</span>
         <span class="nav">
-          <button id="btn-daily" class="mode-btn active">Daily</button>
-          <button id="btn-infinite" class="mode-btn">Infinite</button>
-          <button id="btn-iterative" class="mode-btn">Iterative</button>
+          <span class="btn-group">
+            <button id="btn-daily" class="mode-btn active">Daily</button>
+            <button id="btn-freeplay" class="mode-btn">Freeplay</button>
+          </span>
         </span>
       </div>
       <div class="fill-centre">
         <p class="hero">Name that colour.</p>
         <p class="sub">5 colours. Guess each name.<br>Score by name + colour proximity.</p>
-        <div class="palette-select">
+        <div class="start-options">
+          <span class="btn-group">
+            <button id="btn-classic" class="mode-btn active">Classic</button>
+            <button id="btn-explore" class="mode-btn">Explore</button>
+          </span>
           <select id="palette">
             <option value="All">All colours</option>
             <option value="Crayola">Crayola</option>
             <option value="Pantone">Pantone</option>
             <option value="XKCD">XKCD</option>
-            <option value="Japanese">Japanese</option>
+
             <option value="RAL">RAL</option>
           </select>
         </div>
+
         <button id="btn-start" class="btn">Play</button>
         <div id="history" class="history"></div>
       </div>
@@ -101,9 +107,12 @@
           <span id="result-target-name" class="big-name"></span>
         </div>
         <div class="result-guess-row">
-          <div id="result-guess-swatch" class="inline-swatch"></div>
-          <div class="result-guess-info">
-            <span id="result-guess-name" class="guess-name"></span>
+          <div class="result-guess-left">
+            <span id="result-guess-input" class="guess-label">You guessed: <strong id="result-guess-raw"></strong></span>
+            <span id="result-guess-match" class="guess-label">Closest match by name: <strong id="result-guess-matched"></strong></span>
+          </div>
+          <div class="result-guess-right">
+            <div id="result-guess-swatch" class="inline-swatch"></div>
             <span id="result-guess-source" class="source-tag"></span>
           </div>
         </div>
@@ -134,6 +143,7 @@
       <div class="summary-body">
         <div id="summary-rounds"></div>
         <div id="summary-totals" class="summary-totals"></div>
+        <div id="percentile" class="percentile" style="display:none"></div>
         <div class="summary-actions">
           <button id="btn-share" class="btn">Share</button>
           <button id="btn-play-again" class="btn dim">Play Again</button>
@@ -145,7 +155,7 @@
 
   </div>
 
-  <script src="colors.js?v=1772732852"></script>
-  <script src="game.js?v=1772732852"></script>
+  <script src="colors.js?v=1772749896"></script>
+  <script src="game.js?v=1772749896"></script>
 </body>
 </html>
