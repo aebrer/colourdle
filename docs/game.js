@@ -181,15 +181,13 @@
     return 1 - (2 * overlap) / (totalA + totalB);
   }
 
-  // Measure 4: Word-level Jaccard distance (1 - IoU)
+  // Measure 4: Word-level Jaccard distance (1 - |intersection| / |union|)
   function mWordJaccard(a, b) {
-    var wordsA = a.split(/\s+/);
-    var wordsB = b.split(/\s+/);
-    var setA = {};
-    wordsA.forEach(function (w) { setA[w] = true; });
+    var setA = new Set(a.split(/\s+/));
+    var setB = new Set(b.split(/\s+/));
     var inter = 0;
-    wordsB.forEach(function (w) { if (setA[w]) inter++; });
-    var union = new Set(wordsA.concat(wordsB)).size;
+    setA.forEach(function (w) { if (setB.has(w)) inter++; });
+    var union = setA.size + setB.size - inter;
     return union === 0 ? 0 : 1 - inter / union;
   }
 
@@ -208,7 +206,7 @@
     return maxLen === 0 ? 0 : 1 - bestLen / maxLen;
   }
 
-  // Measure 6: Word containment (fraction of query words found in candidate)
+  // Measure 6: Word containment distance (1 - fraction of query words present in candidate)
   function mWordContainment(a, b) {
     var wordsA = a.split(/\s+/);
     var wordsB = b.split(/\s+/);
@@ -224,6 +222,7 @@
     var pool = state.palette === 'All' ? COLOURS : getPool();
     var query = guess.toLowerCase().trim();
     var N = pool.length;
+    if (N === 0) return { colour: { name: 'Unknown', hex: '#808080', src: '' }, similarity: 0 };
     var M = POEM_MEASURES.length;
 
     // Step 1: Compute distances (M measures × N candidates)
@@ -254,7 +253,7 @@
     for (var ci = 0; ci < candidates.length; ci++) {
       if (dominated.has(candidates[ci])) continue;
       for (var cj = 0; cj < candidates.length; cj++) {
-        if (ci === cj || dominated.has(candidates[cj])) continue;
+        if (ci === cj) continue;
         var ii = candidates[ci], jj = candidates[cj];
         var allLeq = true, anyLt = false;
         for (var m = 0; m < M; m++) {
