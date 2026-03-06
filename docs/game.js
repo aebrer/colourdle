@@ -153,21 +153,38 @@
       fuseInstance = new Fuse(pool, {
         keys: ['name'],
         includeScore: true,
-        threshold: 1.0,        // accept all matches, we pick the best
-        ignoreLocation: true,   // match anywhere in the string
-        findAllMatches: true,
+        threshold: 0.4,
+        ignoreLocation: true,
       });
     }
     return fuseInstance;
   }
 
+  function wordPermutations(arr) {
+    if (arr.length <= 1) return [arr];
+    var result = [];
+    for (var i = 0; i < arr.length; i++) {
+      var rest = arr.slice(0, i).concat(arr.slice(i + 1));
+      wordPermutations(rest).forEach(function (p) { result.push([arr[i]].concat(p)); });
+    }
+    return result;
+  }
+
   function findBestMatch(guess) {
     var pool = state.palette === 'All' ? COLOURS : getPool();
     var fuse = getFuse();
-    var results = fuse.search(guess.trim());
+    var words = guess.trim().split(/\s+/);
+    var perms = words.length <= 4 ? wordPermutations(words) : [words, words.slice().reverse()];
 
-    if (results.length > 0) {
-      var best = results[0];
+    var best = null;
+    for (var i = 0; i < perms.length; i++) {
+      var results = fuse.search(perms[i].join(' '));
+      if (results.length > 0 && (!best || results[0].score < best.score)) {
+        best = results[0];
+      }
+    }
+
+    if (best) {
       var similarity = Math.round((1 - best.score) * 100);
       return { colour: best.item, similarity: similarity };
     }
