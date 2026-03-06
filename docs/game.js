@@ -793,9 +793,11 @@
     } else if (total < 2) {
       pctEl.textContent = 'First score recorded today!';
     } else {
-      var topPct = 100 - percentile;
-      var beaten = Math.round(percentile * total / 100);
-      pctEl.textContent = 'Top ' + topPct + '% (you beat ' + beaten + ' out of ' + total + ' players)';
+      var topPct = Math.max(1, 100 - percentile);
+      var others = total - 1;
+      var beaten = Math.min(others, Math.round(percentile * others / 100));
+      var playerWord = others === 1 ? 'player' : 'players';
+      pctEl.textContent = 'Top ' + topPct + '% (you beat ' + beaten + ' of ' + others + ' ' + playerWord + ')';
     }
     pctEl.style.display = '';
   }
