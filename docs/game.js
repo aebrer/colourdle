@@ -276,7 +276,21 @@
 
     var bestColour = pool[bestIdx];
     var similarity = stringSimilarity(query, bestColour.name);
-    return { colour: bestColour, similarity: similarity };
+
+    // Rank all pool entries by mean POEM distance (for name scoring)
+    var meanDists = new Array(N);
+    for (var i = 0; i < N; i++) {
+      var sum = 0;
+      for (var m = 0; m < M; m++) sum += distances[i][m];
+      meanDists[i] = sum / M;
+    }
+    var rankOrder = [];
+    for (var i = 0; i < N; i++) rankOrder.push(i);
+    rankOrder.sort(function (a, b) { return meanDists[a] - meanDists[b]; });
+    var rankOf = {};
+    for (var r = 0; r < N; r++) rankOf[rankOrder[r]] = r;
+
+    return { colour: bestColour, similarity: similarity, pool: pool, rankOf: rankOf };
   }
 
   // ----------------------------------------------------------
@@ -554,7 +568,17 @@
   }
 
   function computeRoundScore(input, target, match) {
-    var nameScore = stringSimilarity(input, target.name);
+    // Name score: where does the target rank in POEM's consensus ordering?
+    var nameScore = 0;
+    if (match.pool && match.rankOf) {
+      for (var i = 0; i < match.pool.length; i++) {
+        if (match.pool[i].name === target.name) {
+          var rank = match.rankOf[i]; // 0 = closest to guess
+          nameScore = Math.round(Math.pow(1 - rank / (match.pool.length - 1), 2) * 100);
+          break;
+        }
+      }
+    }
     var hsbScore = Math.round(colourScore(target.hex, match.colour.hex));
     var exactMatch = match.colour.hex === target.hex;
     var p = 3;
