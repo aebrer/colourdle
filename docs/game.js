@@ -776,7 +776,7 @@
     [
       ['Name', state.totalName, maxName],
       ['Colour', state.totalHSB, maxHSB],
-      ['Total', state.totalScore, maxTotal],
+      ['Final', state.totalScore, maxTotal],
     ].forEach(function (item) {
       var label = item[0], value = item[1], max = item[2];
       var d = el('div', 'summary-total-item');
