@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Behind the Matching — Colourdle</title>
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='12' fill='%23E8594F'/><rect x='15' y='15' width='70' height='70' rx='6' fill='%234BA3C3'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=1">
+  <style>
+    .compare { max-width: 800px; margin: 0 auto; padding: 20px; }
+    .compare h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+    .compare .subtitle { font-size: 13px; color: var(--fg-dim); margin-bottom: 20px; line-height: 1.6; }
+    .compare .subtitle a { color: var(--fg); border-bottom: 1px solid var(--fg-dim); text-decoration: none; }
+    .compare .subtitle a:hover { border-color: var(--fg); }
+    .compare .back { display: inline-block; margin-bottom: 16px; font-size: 13px; color: var(--fg); text-decoration: none; border-bottom: 1px solid var(--fg-dim); }
+    .compare .back:hover { border-color: var(--fg); }
+    .input-row { display: flex; gap: 8px; margin-bottom: 20px; }
+    .input-row input {
+      font-family: 'IBM Plex Mono', monospace; font-size: 16px; padding: 8px 12px;
+      background: var(--bg); color: var(--fg); border: 1px solid var(--fg-dim); flex: 1;
+    }
+    .input-row button {
+      font-family: 'IBM Plex Mono', monospace; font-size: 14px; padding: 8px 16px;
+      background: var(--fg-dim); color: var(--bg); border: 1px solid var(--fg-dim); cursor: pointer;
+      font-weight: 700;
+    }
+    .input-row button:hover { background: var(--fg); }
+    .results { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 600px) { .results { grid-template-columns: 1fr; } }
+    .result-card { background: var(--bg); border: 1px solid var(--fg-dim); padding: 16px; }
+    .result-card h2 { font-size: 13px; font-weight: 700; margin-bottom: 12px; color: var(--fg-dim); border-bottom: 1px solid var(--fg-dim); padding-bottom: 6px; }
+    .match-name { font-size: 20px; font-weight: bold; margin-bottom: 8px; }
+    .match-swatch { width: 100%; height: 80px; margin-bottom: 8px; border: 1px solid var(--fg-dim); }
+    .match-meta { font-size: 11px; color: var(--fg-dim); line-height: 1.8; }
+    .match-meta .val { color: var(--fg); }
+    .top-list { margin-top: 12px; padding: 0; }
+    .top-list li { font-size: 11px; color: var(--fg-dim); list-style: none; padding: 2px 0; display: flex; align-items: center; gap: 8px; }
+    .top-list .rank { width: 16px; text-align: right; }
+    .top-list .swatch-sm { width: 14px; height: 14px; display: inline-block; border: 1px solid var(--fg-dim); flex-shrink: 0; }
+    .top-list .cname { color: var(--fg); }
+    .top-list .score { margin-left: auto; }
+    .verdict { grid-column: 1/-1; text-align: center; font-size: 14px; font-weight: 700; padding: 12px; }
+    .verdict.same { color: #4a4; }
+    .verdict.diff { color: #e44; }
+    .timing { font-size: 10px; color: var(--fg-dim); margin-top: 8px; }
+    .explainer { margin-top: 24px; font-size: 12px; color: var(--fg-dim); line-height: 1.8; }
+    .explainer h2 { font-size: 14px; font-weight: 700; color: var(--fg); margin-top: 20px; margin-bottom: 6px; }
+    .explainer code { font-size: 11px; background: var(--fg-dim); color: var(--bg); padding: 1px 5px; }
+    .explainer .formula { padding: 8px 0 8px 12px; border-left: 2px solid var(--fg-dim); margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <div class="compare">
+    <a href="about.html" class="back">&larr; Back to about</a>
+
+    <h1>Behind the Matching</h1>
+    <p class="subtitle">
+      Colourdle uses <strong>POEM</strong> (Pareto-Optimal Embedded Matching) to find the closest colour name to your guess.
+      The original algorithm was published in <a href="https://iopscience.iop.org/article/10.1088/2632-2153/ab891b">Brereton et al. 2020</a>
+      for drug property prediction. Colourdle adapts the core idea — multiple distance measures combined via Pareto dominance —
+      but uses a different selection step tuned for nearest-match lookup. Type any colour name below to compare both approaches.
+    </p>
+
+    <div class="input-row">
+      <input type="text" id="guess" placeholder="Type a colour name..." autofocus>
+      <button id="btn">Compare</button>
+    </div>
+    <div class="results" id="results"></div>
+
+    <div class="explainer">
+      <h2>What they share</h2>
+      <p>Both algorithms compute six string distance measures for every colour name in the pool (~3,300 colours), then use Pareto dominance to find a consensus best match without weighting or tuning any individual measure.</p>
+
+      <h2>How they differ</h2>
+      <p><strong>Colourdle</strong> prunes to the top 50% per measure, finds the strict Pareto front (colours not beaten on every measure by any other), then picks the candidate with the lowest mean distance. Fast and focused on proximity to the query.</p>
+      <p><strong>Paper</strong> computes pairwise dominance between all candidates with relaxed tolerance (a candidate can claim dominance even if ≤10% of measures disagree). Each candidate gets a fitness score:</p>
+      <div class="formula"><code>Fitness = MeanDominance × (NumDominating + 0.05) / (NumSubmitting + 0.05)</code></div>
+      <p>This favours candidates that dominate many others overall — ideal for classification tasks where you want the most representative neighbour, but sometimes picks a globally dominant candidate over the one actually closest to your query. Try "gingerbread" for an example where the approaches disagree.</p>
+    </div>
+  </div>
+
+  <script src="colors.js"></script>
+  <script>
+    // Dark mode
+    (function () {
+      try {
+        var store = JSON.parse(localStorage.getItem('colourdle')) || {};
+        var dark = store.dark != null ? store.dark : window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (dark) document.documentElement.classList.add('dark');
+      } catch (e) {}
+    })();
+
+    // ---- Shared measures ----
+    function levenshtein(a, b) {
+      var m = a.length, n = b.length;
+      if (m === 0) return n;
+      if (n === 0) return m;
+      var prev = new Array(n + 1), curr = new Array(n + 1);
+      for (var j = 0; j <= n; j++) prev[j] = j;
+      for (var i = 1; i <= m; i++) {
+        curr[0] = i;
+        for (var j = 1; j <= n; j++) {
+          var cost = a[i - 1] === b[j - 1] ? 0 : 1;
+          curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+        }
+        var tmp = prev; prev = curr; curr = tmp;
+      }
+      return prev[n];
+    }
+
+    function mLevenshtein(a, b) {
+      var maxLen = Math.max(a.length, b.length);
+      return maxLen === 0 ? 0 : levenshtein(a, b) / maxLen;
+    }
+    function mSortedLevenshtein(a, b) {
+      var sa = a.split(/\s+/).sort().join(' ');
+      var sb = b.split(/\s+/).sort().join(' ');
+      var maxLen = Math.max(sa.length, sb.length);
+      return maxLen === 0 ? 0 : levenshtein(sa, sb) / maxLen;
+    }
+    function bigrams(str) {
+      var set = {};
+      for (var i = 0; i < str.length - 1; i++) {
+        var bg = str.slice(i, i + 2);
+        set[bg] = (set[bg] || 0) + 1;
+      }
+      return set;
+    }
+    function mBigramDice(a, b) {
+      if (a.length < 2 || b.length < 2) return 1;
+      var bgA = bigrams(a), bgB = bigrams(b);
+      var overlap = 0, totalA = 0, totalB = 0;
+      for (var k in bgA) { totalA += bgA[k]; if (bgB[k]) overlap += Math.min(bgA[k], bgB[k]); }
+      for (var k in bgB) { totalB += bgB[k]; }
+      return 1 - (2 * overlap) / (totalA + totalB);
+    }
+    function mWordJaccard(a, b) {
+      var setA = new Set(a.split(/\s+/));
+      var setB = new Set(b.split(/\s+/));
+      var inter = 0;
+      setA.forEach(function (w) { if (setB.has(w)) inter++; });
+      var union = setA.size + setB.size - inter;
+      return union === 0 ? 0 : 1 - inter / union;
+    }
+    function mSubstring(a, b) {
+      var sh = a.length <= b.length ? a : b;
+      var lo = a.length <= b.length ? b : a;
+      var bestLen = 0;
+      for (var i = 0; i < sh.length; i++) {
+        for (var j = bestLen + 1; j <= sh.length - i; j++) {
+          if (lo.indexOf(sh.slice(i, i + j)) !== -1) bestLen = j;
+          else break;
+        }
+      }
+      var maxLen = Math.max(a.length, b.length);
+      return maxLen === 0 ? 0 : 1 - bestLen / maxLen;
+    }
+    function mWordContainment(a, b) {
+      var wordsA = a.split(/\s+/);
+      var wordsB = b.split(/\s+/);
+      var found = 0;
+      wordsA.forEach(function (w) { if (wordsB.indexOf(w) !== -1) found++; });
+      return wordsA.length === 0 ? 0 : 1 - found / wordsA.length;
+    }
+
+    var MEASURES = [mLevenshtein, mSortedLevenshtein, mBigramDice, mWordJaccard, mSubstring, mWordContainment];
+    var MEASURE_NAMES = ['Levenshtein', 'Sorted Lev.', 'Bigram Dice', 'Word Jaccard', 'Substring', 'Word Contain.'];
+    var M = MEASURES.length;
+
+    var POOL = COLOURS.map(function (c) { return { name: c.name, hex: c.hex, src: c.src, lower: c.name.toLowerCase() }; });
+    var N = POOL.length;
+
+    function computeDistances(query) {
+      var distances = new Array(N);
+      for (var i = 0; i < N; i++) {
+        distances[i] = new Array(M);
+        for (var m = 0; m < M; m++) {
+          distances[i][m] = MEASURES[m](query, POOL[i].lower);
+        }
+      }
+      return distances;
+    }
+
+    // ---- Colourdle: Pareto front + mean tiebreak ----
+    function matchColourdle(query, distances) {
+      var cutoff = Math.ceil(N * 0.5);
+      var survivors = new Set();
+      for (var m = 0; m < M; m++) {
+        var indices = [];
+        for (var i = 0; i < N; i++) indices.push(i);
+        indices.sort(function (a, b) { return distances[a][m] - distances[b][m]; });
+        for (var r = 0; r < cutoff && r < indices.length; r++) survivors.add(indices[r]);
+      }
+      var candidates = Array.from(survivors);
+
+      var dominated = new Set();
+      for (var ci = 0; ci < candidates.length; ci++) {
+        if (dominated.has(candidates[ci])) continue;
+        for (var cj = 0; cj < candidates.length; cj++) {
+          if (ci === cj) continue;
+          var ii = candidates[ci], jj = candidates[cj];
+          var allLeq = true, anyLt = false;
+          for (var m = 0; m < M; m++) {
+            if (distances[jj][m] > distances[ii][m]) { allLeq = false; break; }
+            if (distances[jj][m] < distances[ii][m]) anyLt = true;
+          }
+          if (allLeq && anyLt) { dominated.add(ii); break; }
+        }
+      }
+      var front = candidates.filter(function (i) { return !dominated.has(i); });
+
+      var ranked = front.map(function (i) {
+        var sum = 0;
+        for (var m = 0; m < M; m++) sum += distances[i][m];
+        return { idx: i, mean: sum / M };
+      }).sort(function (a, b) { return a.mean - b.mean; });
+
+      return { top: ranked.slice(0, 10), frontSize: front.length, candidateCount: candidates.length };
+    }
+
+    // ---- Paper: relaxed dominance + fitness score ----
+    function matchPaperFitness(query, distances) {
+      var tolerance = Math.floor(M * 0.1);
+
+      var numDominating = new Float32Array(N);
+      var numSubmitting = new Float32Array(N);
+      var sumDominance = new Float64Array(N);
+      var pairCount = new Float32Array(N);
+
+      for (var i = 0; i < N; i++) {
+        for (var j = i + 1; j < N; j++) {
+          var iCloser = 0, jCloser = 0, ties = 0;
+          for (var m = 0; m < M; m++) {
+            if (distances[i][m] < distances[j][m]) iCloser++;
+            else if (distances[i][m] > distances[j][m]) jCloser++;
+            else ties++;
+          }
+
+          var domIJ = (iCloser + ties * 0.5) / M;
+          var domJI = (jCloser + ties * 0.5) / M;
+
+          sumDominance[i] += domIJ;
+          sumDominance[j] += domJI;
+          pairCount[i]++;
+          pairCount[j]++;
+
+          if (jCloser <= tolerance && iCloser > 0) {
+            numDominating[i]++;
+            numSubmitting[j]++;
+          }
+          if (iCloser <= tolerance && jCloser > 0) {
+            numDominating[j]++;
+            numSubmitting[i]++;
+          }
+        }
+      }
+
+      var fitness = new Array(N);
+      for (var i = 0; i < N; i++) {
+        var meanDom = pairCount[i] > 0 ? sumDominance[i] / pairCount[i] : 0;
+        fitness[i] = {
+          idx: i,
+          score: meanDom * (numDominating[i] + 0.05) / (numSubmitting[i] + 0.05),
+          meanDom: meanDom,
+          numDom: numDominating[i],
+          numSub: numSubmitting[i]
+        };
+      }
+
+      fitness.sort(function (a, b) { return b.score - a.score; });
+      return { top: fitness.slice(0, 10) };
+    }
+
+    // ---- DOM helpers ----
+    function clearEl(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+    function txt(str) { return document.createTextNode(str); }
+    function mkEl(tag, cls, text) {
+      var el = document.createElement(tag);
+      if (cls) el.className = cls;
+      if (text != null) el.appendChild(txt(text));
+      return el;
+    }
+
+    function renderCard(parent, title, result, distances, isPaper) {
+      var card = mkEl('div', 'result-card');
+      card.appendChild(mkEl('h2', null, title));
+
+      var top = result.top;
+      var best = top[0];
+      var bestIdx = best.idx;
+      var bestColour = POOL[bestIdx];
+
+      var swatch = mkEl('div', 'match-swatch');
+      swatch.style.backgroundColor = bestColour.hex;
+      card.appendChild(swatch);
+      card.appendChild(mkEl('div', 'match-name', bestColour.name));
+
+      var meta = mkEl('div', 'match-meta');
+      meta.appendChild(mkEl('span', 'val', bestColour.hex));
+      meta.appendChild(txt(' \u00b7 ' + bestColour.src));
+      meta.appendChild(document.createElement('br'));
+
+      if (isPaper) {
+        meta.appendChild(txt('Fitness: '));
+        meta.appendChild(mkEl('span', 'val', best.score.toFixed(4)));
+        meta.appendChild(document.createElement('br'));
+        meta.appendChild(txt('MeanDom: '));
+        meta.appendChild(mkEl('span', 'val', best.meanDom.toFixed(4)));
+        meta.appendChild(txt(' \u00b7 Dominating: '));
+        meta.appendChild(mkEl('span', 'val', String(best.numDom)));
+        meta.appendChild(txt(' \u00b7 Submitting: '));
+        meta.appendChild(mkEl('span', 'val', String(best.numSub)));
+      } else {
+        meta.appendChild(txt('Mean dist: '));
+        meta.appendChild(mkEl('span', 'val', best.mean.toFixed(4)));
+        meta.appendChild(document.createElement('br'));
+        meta.appendChild(txt('Front size: '));
+        meta.appendChild(mkEl('span', 'val', String(result.frontSize)));
+        meta.appendChild(txt(' \u00b7 Candidates: '));
+        meta.appendChild(mkEl('span', 'val', String(result.candidateCount)));
+      }
+
+      meta.appendChild(document.createElement('br'));
+      for (var m = 0; m < M; m++) {
+        meta.appendChild(txt(MEASURE_NAMES[m] + ': '));
+        meta.appendChild(mkEl('span', 'val', distances[bestIdx][m].toFixed(3)));
+        if (m < M - 1) meta.appendChild(txt(' \u00b7 '));
+      }
+      card.appendChild(meta);
+
+      var list = mkEl('ol', 'top-list');
+      for (var r = 0; r < top.length; r++) {
+        var idx = top[r].idx;
+        var c = POOL[idx];
+        var scoreStr = isPaper ? top[r].score.toFixed(4) : top[r].mean.toFixed(4);
+        var li = mkEl('li');
+        li.appendChild(mkEl('span', 'rank', String(r + 1)));
+        var sw = mkEl('span', 'swatch-sm');
+        sw.style.backgroundColor = c.hex;
+        li.appendChild(sw);
+        li.appendChild(mkEl('span', 'cname', c.name));
+        li.appendChild(mkEl('span', 'score', scoreStr));
+        list.appendChild(li);
+      }
+      card.appendChild(list);
+
+      parent.appendChild(card);
+    }
+
+    function compare() {
+      var guess = document.getElementById('guess').value.trim();
+      if (!guess) return;
+      var query = guess.toLowerCase();
+
+      var t0 = performance.now();
+      var distances = computeDistances(query);
+      var tDist = performance.now() - t0;
+
+      var t1 = performance.now();
+      var colourdle = matchColourdle(query, distances);
+      var tColourdle = performance.now() - t1;
+
+      var t2 = performance.now();
+      var paper = matchPaperFitness(query, distances);
+      var tPaper = performance.now() - t2;
+
+      var container = document.getElementById('results');
+      clearEl(container);
+
+      renderCard(container, 'Colourdle (Pareto front + mean distance)', colourdle, distances, false);
+      container.lastChild.appendChild(mkEl('div', 'timing',
+        'Distances: ' + tDist.toFixed(0) + 'ms \u00b7 Selection: ' + tColourdle.toFixed(0) + 'ms'));
+
+      renderCard(container, 'Paper (relaxed dominance + fitness score)', paper, distances, true);
+      container.lastChild.appendChild(mkEl('div', 'timing',
+        'Selection: ' + tPaper.toFixed(0) + 'ms'));
+
+      var sameMatch = POOL[colourdle.top[0].idx].name === POOL[paper.top[0].idx].name;
+      container.appendChild(mkEl('div', 'verdict ' + (sameMatch ? 'same' : 'diff'),
+        sameMatch ? 'Both algorithms agree' : 'Different results!'));
+    }
+
+    document.getElementById('btn').addEventListener('click', compare);
+    document.getElementById('guess').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') compare();
+    });
+  </script>
+</body>
+</html>
