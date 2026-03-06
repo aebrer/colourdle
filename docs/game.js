@@ -142,55 +142,142 @@
     return Math.round((1 - levenshtein(a, b) / maxLen) * 100);
   }
 
-  // Fuse.js instance — rebuilt when palette changes
-  var fuseInstance = null;
-  var fusePool = null;
+  // ----------------------------------------------------------
+  // POEM: Pareto-Optimal Embedded Matching (Brereton et al.)
+  // Multiple cheap similarity measures combined via Pareto
+  // dominance — no single measure needs to be "right".
+  // ----------------------------------------------------------
 
-  function getFuse() {
-    var pool = state.palette === 'All' ? COLOURS : getPool();
-    if (fusePool !== pool) {
-      fusePool = pool;
-      fuseInstance = new Fuse(pool, {
-        keys: ['name'],
-        includeScore: true,
-        threshold: 0.4,
-        ignoreLocation: true,
-      });
-    }
-    return fuseInstance;
+  // Measure 1: Levenshtein distance (normalized 0-1, lower=closer)
+  function mLevenshtein(a, b) {
+    var maxLen = Math.max(a.length, b.length);
+    return maxLen === 0 ? 0 : levenshtein(a, b) / maxLen;
   }
 
-  function wordPermutations(arr) {
-    if (arr.length <= 1) return [arr];
-    var result = [];
-    for (var i = 0; i < arr.length; i++) {
-      var rest = arr.slice(0, i).concat(arr.slice(i + 1));
-      wordPermutations(rest).forEach(function (p) { result.push([arr[i]].concat(p)); });
-    }
-    return result;
+  // Measure 2: Word-sorted Levenshtein (order-independent)
+  function mSortedLevenshtein(a, b) {
+    var sa = a.split(/\s+/).sort().join(' ');
+    var sb = b.split(/\s+/).sort().join(' ');
+    var maxLen = Math.max(sa.length, sb.length);
+    return maxLen === 0 ? 0 : levenshtein(sa, sb) / maxLen;
   }
+
+  // Measure 3: Character bigram Dice coefficient (1 - similarity)
+  function bigrams(str) {
+    var set = {};
+    for (var i = 0; i < str.length - 1; i++) {
+      var bg = str.slice(i, i + 2);
+      set[bg] = (set[bg] || 0) + 1;
+    }
+    return set;
+  }
+
+  function mBigramDice(a, b) {
+    if (a.length < 2 || b.length < 2) return 1;
+    var bgA = bigrams(a), bgB = bigrams(b);
+    var overlap = 0, totalA = 0, totalB = 0;
+    for (var k in bgA) { totalA += bgA[k]; if (bgB[k]) overlap += Math.min(bgA[k], bgB[k]); }
+    for (var k in bgB) { totalB += bgB[k]; }
+    return 1 - (2 * overlap) / (totalA + totalB);
+  }
+
+  // Measure 4: Word-level Jaccard distance (1 - IoU)
+  function mWordJaccard(a, b) {
+    var wordsA = a.split(/\s+/);
+    var wordsB = b.split(/\s+/);
+    var setA = {};
+    wordsA.forEach(function (w) { setA[w] = true; });
+    var inter = 0;
+    wordsB.forEach(function (w) { if (setA[w]) inter++; });
+    var union = new Set(wordsA.concat(wordsB)).size;
+    return union === 0 ? 0 : 1 - inter / union;
+  }
+
+  // Measure 5: Best substring containment (1 - ratio of longest common substring)
+  function mSubstring(a, b) {
+    var short = a.length <= b.length ? a : b;
+    var long = a.length <= b.length ? b : a;
+    var bestLen = 0;
+    for (var i = 0; i < short.length; i++) {
+      for (var j = bestLen + 1; j <= short.length - i; j++) {
+        if (long.indexOf(short.slice(i, i + j)) !== -1) bestLen = j;
+        else break;
+      }
+    }
+    var maxLen = Math.max(a.length, b.length);
+    return maxLen === 0 ? 0 : 1 - bestLen / maxLen;
+  }
+
+  // Measure 6: Word containment (fraction of query words found in candidate)
+  function mWordContainment(a, b) {
+    var wordsA = a.split(/\s+/);
+    var wordsB = b.split(/\s+/);
+    var found = 0;
+    wordsA.forEach(function (w) { if (wordsB.indexOf(w) !== -1) found++; });
+    return wordsA.length === 0 ? 0 : 1 - found / wordsA.length;
+  }
+
+  var POEM_MEASURES = [mLevenshtein, mSortedLevenshtein, mBigramDice, mWordJaccard, mSubstring, mWordContainment];
+  var POEM_PRUNE_PCT = 0.5;
 
   function findBestMatch(guess) {
     var pool = state.palette === 'All' ? COLOURS : getPool();
-    var fuse = getFuse();
-    var words = guess.trim().split(/\s+/);
-    var perms = words.length <= 4 ? wordPermutations(words) : [words, words.slice().reverse()];
+    var query = guess.toLowerCase().trim();
+    var N = pool.length;
+    var M = POEM_MEASURES.length;
 
-    var best = null;
-    for (var i = 0; i < perms.length; i++) {
-      var results = fuse.search(perms[i].join(' '));
-      if (results.length > 0 && (!best || results[0].score < best.score)) {
-        best = results[0];
+    // Step 1: Compute distances (M measures × N candidates)
+    var distances = new Array(N);
+    for (var i = 0; i < N; i++) {
+      var name = pool[i].name.toLowerCase();
+      distances[i] = new Array(M);
+      for (var m = 0; m < M; m++) {
+        distances[i][m] = POEM_MEASURES[m](query, name);
       }
     }
 
-    if (best) {
-      var similarity = Math.round((1 - best.score) * 100);
-      return { colour: best.item, similarity: similarity };
+    // Step 2: Prune — keep candidates in top 50% of ANY measure
+    var cutoff = Math.ceil(N * POEM_PRUNE_PCT);
+    var survivors = new Set();
+    for (var m = 0; m < M; m++) {
+      var indices = [];
+      for (var i = 0; i < N; i++) indices.push(i);
+      indices.sort(function (a, b) { return distances[a][m] - distances[b][m]; });
+      for (var r = 0; r < cutoff && r < indices.length; r++) {
+        survivors.add(indices[r]);
+      }
     }
+    var candidates = Array.from(survivors);
 
-    // Fallback: return first colour in pool (shouldn't happen)
-    return { colour: pool[0], similarity: 0 };
+    // Step 3: Pareto front — candidates not dominated by any other
+    var dominated = new Set();
+    for (var ci = 0; ci < candidates.length; ci++) {
+      if (dominated.has(candidates[ci])) continue;
+      for (var cj = 0; cj < candidates.length; cj++) {
+        if (ci === cj || dominated.has(candidates[cj])) continue;
+        var ii = candidates[ci], jj = candidates[cj];
+        var allLeq = true, anyLt = false;
+        for (var m = 0; m < M; m++) {
+          if (distances[jj][m] > distances[ii][m]) { allLeq = false; break; }
+          if (distances[jj][m] < distances[ii][m]) anyLt = true;
+        }
+        if (allLeq && anyLt) { dominated.add(ii); break; }
+      }
+    }
+    var front = candidates.filter(function (i) { return !dominated.has(i); });
+
+    // Step 4: Tiebreak within Pareto front by mean distance
+    var bestMean = Infinity;
+    var bestIdx = front[0];
+    front.forEach(function (i) {
+      var sum = 0;
+      for (var m = 0; m < M; m++) sum += distances[i][m];
+      if (sum / M < bestMean) { bestMean = sum / M; bestIdx = i; }
+    });
+
+    var bestColour = pool[bestIdx];
+    var similarity = stringSimilarity(query, bestColour.name);
+    return { colour: bestColour, similarity: similarity };
   }
 
   // ----------------------------------------------------------
