@@ -168,12 +168,17 @@ body {
   line-height: 1.8;
 }
 
-/* Source hint — shown during guessing */
-.source-hint {
-  font-size: 11px;
-  color: var(--fg-dim);
+/* Source subtitle — burned-in pirated movie style */
+.source-subtitle {
+  font-size: 28px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.15em;
+  color: #fff;
+  -webkit-text-stroke: 2px #000;
+  paint-order: stroke fill;
+  text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+  margin-bottom: 16px;
 }
 
 .source-tag {
