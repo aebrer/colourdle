@@ -40,7 +40,7 @@ Weighted objectives are possible by duplicating measure columns (not yet used).
 
 ### Scoring (game.js)
 
-- **Name score**: Levenshtein similarity (0-100)
+- **Name score**: POEM rank-based — where the target lands in the mean-distance ranking of all pool names, with quadratic curve: `round((1 - rank / (N-1))^2 * 100)`
 - **Colour score**: CIELAB Delta E through sigmoid: `100 / (1 + (dE / 30)^1.8)`
 - **Combined**: Power mean (p=3) of both scores
 - **Bonus**: 2x multiplier for exact hex match
