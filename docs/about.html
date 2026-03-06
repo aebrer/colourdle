@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=1772749896">
+  <link rel="stylesheet" href="style.css?v=1772765834">
   <style>
     .about {
       max-width: 600px;
@@ -136,7 +136,19 @@
 
     <h2>How Matching Works</h2>
 
-    <p>When you type a guess, the game finds the closest colour name in the active pool using fuzzy string matching. So "scarltt" still matches "Scarlet", and "dark blue" might match "Dark Blue Green". The matched colour is then compared to the target for the colour score.</p>
+    <p>When you type a guess, the game finds the closest colour name in the active pool using <strong>POEM</strong> (Pareto-Optimal Embedded Matching), adapted from <a href="https://arxiv.org/abs/2002.04555">Brereton et al. 2020</a>. Instead of relying on a single matching algorithm, POEM combines six independent similarity measures and uses Pareto dominance to find the best consensus match.</p>
+
+    <p>The six measures are:</p>
+    <ul>
+      <li>Levenshtein distance (character edits)</li>
+      <li>Word-sorted Levenshtein (order-independent)</li>
+      <li>Character bigram Dice coefficient</li>
+      <li>Word-level Jaccard distance</li>
+      <li>Longest common substring ratio</li>
+      <li>Word containment (query words found in candidate)</li>
+    </ul>
+
+    <p>A colour name is only chosen if no other candidate beats it on every measure simultaneously. This means "gray sky" correctly matches "Sky Gray" even though no single measure would reliably pick it. The result is robust fuzzy matching with zero dependencies — no ML models, no API calls, just cheap string metrics that are smart together.</p>
 
     <p>This means there are two strategies: guess the exact name (high name score), or guess a colour that's perceptually close (high colour score). The best guesses do both.</p>
 
@@ -147,8 +159,8 @@
       <li>Classic and Explore dailies use different seeds so they present different colours</li>
       <li>Colour distance uses the CIELAB colour space with D65 reference white, which approximates human colour perception better than RGB or HSB distance</li>
       <li>Text contrast (black or white) switches automatically based on WCAG relative luminance of the background colour</li>
-      <li>All game state is stored in your browser's localStorage — nothing is sent to a server</li>
-      <li>The entire game is static HTML/CSS/JS with no dependencies</li>
+      <li>Game state is stored in your browser's localStorage. Daily scores are submitted anonymously for percentile ranking via a Cloudflare Worker</li>
+      <li>The entire game is static HTML/CSS/JS with zero external dependencies</li>
     </ul>
 
     <h2>Credits</h2>
