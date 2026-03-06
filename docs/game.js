@@ -142,19 +142,38 @@
     return Math.round((1 - levenshtein(a, b) / maxLen) * 100);
   }
 
+  // Fuse.js instance — rebuilt when palette changes
+  var fuseInstance = null;
+  var fusePool = null;
+
+  function getFuse() {
+    var pool = state.palette === 'All' ? COLOURS : getPool();
+    if (fusePool !== pool) {
+      fusePool = pool;
+      fuseInstance = new Fuse(pool, {
+        keys: ['name'],
+        includeScore: true,
+        threshold: 1.0,        // accept all matches, we pick the best
+        ignoreLocation: true,   // match anywhere in the string
+        findAllMatches: true,
+      });
+    }
+    return fuseInstance;
+  }
+
   function findBestMatch(guess) {
     var pool = state.palette === 'All' ? COLOURS : getPool();
-    const normalized = guess.toLowerCase().trim();
-    let bestScore = -1;
-    let bestColour = null;
-    for (const c of pool) {
-      const score = stringSimilarity(normalized, c.name);
-      if (score > bestScore) {
-        bestScore = score;
-        bestColour = c;
-      }
+    var fuse = getFuse();
+    var results = fuse.search(guess.trim());
+
+    if (results.length > 0) {
+      var best = results[0];
+      var similarity = Math.round((1 - best.score) * 100);
+      return { colour: best.item, similarity: similarity };
     }
-    return { colour: bestColour, similarity: bestScore };
+
+    // Fallback: return first colour in pool (shouldn't happen)
+    return { colour: pool[0], similarity: 0 };
   }
 
   // ----------------------------------------------------------
