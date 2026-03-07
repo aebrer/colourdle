@@ -898,6 +898,10 @@
         } else if (saved.percentile != null) {
           showPercentile(saved.percentile, saved.percentileTotal);
         }
+      }).catch(function () {
+        if (saved.percentile != null) {
+          showPercentile(saved.percentile, saved.percentileTotal);
+        }
       });
     } else if (saved.percentile != null) {
       showPercentile(saved.percentile, saved.percentileTotal);
