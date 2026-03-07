@@ -467,7 +467,12 @@
     }
   }
 
-  function fetchPercentile(key, score) {
+  function fetchPercentile(key, score, readOnly) {
+    if (readOnly) {
+      return fetch(WORKER_URL + '/score?key=' + encodeURIComponent(key) + '&score=' + score)
+        .then(function (r) { return r.json(); })
+        .catch(function () { return null; });
+    }
     return fetch(WORKER_URL + '/score', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -879,10 +884,26 @@
     showSummaryContent();
     showScreen('summary');
 
-    // Show cached percentile for history views
+    // Show percentile for history views — refresh if within 48h window
     var pctEl = $('#percentile');
     pctEl.style.display = 'none';
-    if (saved.percentile != null) {
+    var age = getDailyNumber() - info.dayNum;
+    if (age <= 1 && !isPerfectScore()) {
+      // Recent enough that scores still exist in KV — re-fetch (read-only)
+      var pKey = dailyKey(info.dayNum, info.palette, info.type);
+      fetchPercentile(pKey, saved.totalScore, true).then(function (data) {
+        if (data && data.total > 0) {
+          savePercentile(info.dayNum, info.palette, info.type, data.percentile, data.total);
+          showPercentile(data.percentile, data.total);
+        } else if (saved.percentile != null) {
+          showPercentile(saved.percentile, saved.percentileTotal);
+        }
+      }).catch(function () {
+        if (saved.percentile != null) {
+          showPercentile(saved.percentile, saved.percentileTotal);
+        }
+      });
+    } else if (saved.percentile != null) {
       showPercentile(saved.percentile, saved.percentileTotal);
     }
   }
