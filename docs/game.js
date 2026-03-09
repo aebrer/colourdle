@@ -349,9 +349,10 @@
   };
 
   function getDailyNumber() {
-    const epoch = new Date(2026, 2, 4); // local midnight, month 0-indexed
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Use UTC dates to avoid DST shifting the day count
+    const epoch = Date.UTC(2026, 2, 4);
+    const now = new Date();
+    const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
     return Math.floor((today - epoch) / 86400000) + 1;
   }
 
