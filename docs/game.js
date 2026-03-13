@@ -689,8 +689,8 @@
       $('#iter-feedback').style.display = '';
       $('#btn-done').style.display = '';
 
-      // Auto-done at max guesses
-      if (state.iterGuessCount >= MAX_ITER_GUESSES) {
+      // Auto-done on exact match or max guesses
+      if (match.colour.hex === target.hex || state.iterGuessCount >= MAX_ITER_GUESSES) {
         exploreDone();
         return;
       }
