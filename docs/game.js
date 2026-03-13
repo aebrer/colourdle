@@ -219,7 +219,7 @@
   var POEM_PRUNE_PCT = 0.5;
 
   function findBestMatch(guess) {
-    var pool = state.palette === 'All' ? COLOURS : getPool();
+    var pool = getPool();
     var query = guess.toLowerCase().trim();
     var N = pool.length;
     if (N === 0) return { colour: { name: 'Unknown', hex: '#808080', src: '' }, similarity: 0 };
@@ -320,10 +320,21 @@
   // ----------------------------------------------------------
   // Palette filtering
   // ----------------------------------------------------------
+  // "Meodai Full" is opt-in only — excluded from "All" pool
+  // Cache pools to avoid re-filtering 30k+ entries on every guess
+  var _poolCache = {};
   function getPool() {
     var palette = state.palette;
-    if (palette === 'All') return COLOURS;
-    return COLOURS.filter(function (c) { return c.src === palette; });
+    if (_poolCache[palette]) return _poolCache[palette];
+    var pool;
+    if (palette === 'All')
+      pool = COLOURS.filter(function (c) { return c.src !== 'Meodai Full'; });
+    else if (palette === 'Meodai Full')
+      pool = COLOURS.filter(function (c) { return c.src === 'Meodai' || c.src === 'Meodai Full'; });
+    else
+      pool = COLOURS.filter(function (c) { return c.src === palette; });
+    _poolCache[palette] = pool;
+    return pool;
   }
 
   // ----------------------------------------------------------
@@ -362,12 +373,17 @@
     const rng = mulberry32(seed);
     const picked = [];
     const used = new Set();
+    // For "All" palette, avoid picking the same source twice in a row
+    var noRepeatSrc = (state.palette === 'All');
+    var lastSrc = null;
     while (picked.length < ROUNDS) {
       const idx = Math.floor(rng() * pool.length);
-      if (!used.has(idx)) {
-        used.add(idx);
-        picked.push(pool[idx]);
-      }
+      if (used.has(idx)) continue;
+      var c = pool[idx];
+      if (noRepeatSrc && c.src === lastSrc) continue;
+      used.add(idx);
+      picked.push(c);
+      lastSrc = c.src;
     }
     return picked;
   }
@@ -553,7 +569,29 @@
     var total = state.timing === 'daily' ? ROUNDS : '\u221E';
     $('#round-counter').textContent = roundNum + ' / ' + total;
     $('#running-score').textContent = state.totalScore;
-    $('#game-source').textContent = target.src;
+    var SOURCE_INFO = {
+      'Crayola': 'Classic crayon colours from the Crayola box.',
+      'Pantone': 'Standardised colours used in printing, fashion, and design.',
+      'XKCD': 'Crowdsourced colour names from the XKCD colour survey.',
+      'RAL': 'European industrial colour standards used in paint and coatings.',
+      'Meodai': 'Curated community colour names from meodai/color-names.',
+      'Meodai Full': 'The complete meodai/color-names dataset — over 30,000 creative colour names.'
+    };
+    var srcEl = $('#game-source');
+    srcEl.textContent = target.src;
+    var info = document.createElement('span');
+    info.className = 'source-info';
+    info.textContent = 'i';
+    info.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var tip = srcEl.querySelector('.source-tip');
+      if (tip) { tip.remove(); return; }
+      tip = document.createElement('div');
+      tip.className = 'source-tip';
+      tip.textContent = SOURCE_INFO[target.src] || 'The palette this colour comes from.';
+      srcEl.appendChild(tip);
+    });
+    srcEl.appendChild(info);
     $('#guess-input').value = '';
 
     // Show finish button in freeplay after at least 1 round

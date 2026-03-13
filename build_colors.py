@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 Compile colour databases from multiple sources into a single JS file.
-Sources: CSS/X11, Crayola, Pantone, XKCD survey, Japanese traditional, RAL.
+Sources: CSS/X11, Crayola, Pantone, XKCD survey, Japanese traditional, RAL, Meodai.
 """
+import csv
 import json
 import re
 import urllib.request
@@ -259,6 +260,34 @@ def collect_japanese():
     ]
     return [(n, normalize_hex(h)) for n, h in colors]
 
+def collect_meodai(good_only=False):
+    """Meodai/color-names — community-curated colour names from GitHub.
+    good_only=True returns only the ~4,900 'good name' entries.
+    good_only=False returns all ~31,900 entries.
+    """
+    url = "https://raw.githubusercontent.com/meodai/color-names/main/src/colornames.csv"
+    try:
+        with urllib.request.urlopen(url) as r:
+            text = r.read().decode('utf-8')
+    except Exception:
+        return []
+
+    colors = []
+    reader = csv.reader(text.strip().split('\n'))
+    next(reader)  # skip header
+    for row in reader:
+        if len(row) < 2:
+            continue
+        name = row[0].strip()
+        hex_val = row[1].strip()
+        is_good = len(row) >= 3 and row[2].strip().lower() == 'x'
+        if good_only and not is_good:
+            continue
+        if not name or not hex_val:
+            continue
+        colors.append((name, normalize_hex(hex_val)))
+    return colors
+
 def collect_ral():
     """RAL industrial colors."""
     colors = [
@@ -398,6 +427,12 @@ def main():
     # add_source("Japanese", collect_japanese())
     add_source("RAL", collect_ral())
 
+    print("  Fetching Meodai colour names...")
+    # Meodai "good" names go in first (included in "All" pool)
+    add_source("Meodai", collect_meodai(good_only=True))
+    # Remaining Meodai names (opt-in palette only, excluded from "All")
+    add_source("Meodai Full", collect_meodai(good_only=False))
+
     # Sort alphabetically
     all_colours.sort(key=lambda x: x[0].lower())
 
@@ -405,7 +440,7 @@ def main():
 
     # Generate JS
     lines = ["// Auto-generated colour database — DO NOT EDIT MANUALLY",
-             f"// {len(all_colours)} colours from CSS, Crayola, XKCD, Pantone, Japanese, RAL",
+             f"// {len(all_colours)} colours from Crayola, Pantone, XKCD, RAL, Meodai",
              "// Run: python3 build_colors.py",
              "",
              "const COLOURS = ["]
