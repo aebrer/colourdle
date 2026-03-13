@@ -180,6 +180,35 @@ body {
   text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
   margin-bottom: 16px;
 }
+.source-info {
+  display: inline-block;
+  font-size: 10px;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+  text-align: center;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  color: #fff;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  text-transform: lowercase;
+  letter-spacing: 0;
+  vertical-align: super;
+  margin-left: 4px;
+  cursor: pointer;
+  font-style: italic;
+}
+.source-tip {
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  color: rgba(255,255,255,0.7);
+  margin-top: 4px;
+}
 
 .source-tag {
   font-size: 11px;
